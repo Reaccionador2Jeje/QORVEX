@@ -21,7 +21,7 @@ Under `QORVEX_SOURCE_ROOT`:
 
 - `pcre2-10.44/`
 - `libffi-3.4.6/`
-- `glib-2.82.5/`
+- `glib-2.84.4/`
 - `pixman-0.44.2/`
 - `attr-2.5.2/`
 - `libusb-1.0.27/`
