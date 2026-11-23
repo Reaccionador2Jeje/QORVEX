@@ -19,6 +19,19 @@ class VirtualMachineTest {
     }
 
     @Test
+    fun installationMediaUriSurvivesJsonRoundTrip() {
+        val original = VirtualMachine(
+            name = "Installer",
+            architecture = GuestArchitecture.AARCH64,
+            memoryMiB = 1024,
+            cpuCores = 2,
+            diskSizeGiB = 8,
+            installationMediaUri = "content://provider/document/123"
+        )
+        assertEquals(original, VirtualMachine.fromJson(original.toJson()))
+    }
+
+    @Test
     fun blankNameIsRejected() {
         assertThrows(IllegalArgumentException::class.java) {
             VirtualMachine("id", " ", GuestArchitecture.AARCH64, 1024, 2, 16)
