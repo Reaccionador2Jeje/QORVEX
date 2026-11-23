@@ -6,6 +6,7 @@ import dev.atdev.qorvex.storage.InstallationMediaManager
 import dev.atdev.qorvex.storage.VirtualDiskManager
 import dev.atdev.qorvex.vm.GuestArchitecture
 import dev.atdev.qorvex.vm.VirtualMachine
+import dev.atdev.qorvex.vm.VirtualMachineRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -68,6 +69,7 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
     private val appContext = context.applicationContext
     private val qemuExecutable = File(appContext.applicationInfo.nativeLibraryDir, QEMU_LIBRARY)
     private val diskManager = VirtualDiskManager(appContext)
+    private val sessionJournal = RuntimeSessionJournal(appContext)
     private val mediaManager = InstallationMediaManager(appContext)
     private val runtimeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val startMutex = Mutex()
@@ -83,6 +85,10 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
 
     @Volatile
     private var process: Process? = null
+
+    init {
+        recoverInterruptedSession()
+    }
 
     override fun getCapabilities(): RuntimeCapabilities {
         if (Build.SUPPORTED_ABIS.none { it == "arm64-v8a" }) {
@@ -133,7 +139,12 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
         mutableConsole.value = ""
         try {
             withContext(Dispatchers.IO) {
-                val disk = diskManager.createSparseDisk(machine).file
+                val diskInfo = diskManager.createSparseDisk(machine)
+                val diskReport = diskManager.verifyIntegrity(machine)
+                check(diskReport.valid) {
+                    "Virtual disk integrity check failed: ${diskReport.issues.joinToString(" ")}"
+                }
+                val disk = diskInfo.file
                 val media = mediaManager.inspect(machine)?.file
                 if (machine.installationMediaName != null && media == null) {
                     error("The imported installation image is missing. Select it again before booting.")
@@ -160,6 +171,9 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
                     firmwareVars = firmware.second,
                     qmpSocket = qmpSocket
                 )
+                // Persist before spawning QEMU. If Android kills the app process,
+                // the next launch can identify this VM as an interrupted session.
+                sessionJournal.begin(machine.id, diskInfo.capacityBytes)
                 val child = ProcessBuilder(command)
                     .directory(appContext.filesDir)
                     .redirectErrorStream(true)
@@ -183,6 +197,7 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
                     val exitCode = runCatching { child.waitFor() }.getOrDefault(-1)
                     if (process === child) {
                         process = null
+                        sessionJournal.clear()
                         qmpSocketFor(machine.id).delete()
                         mutableActiveMachineId.value = null
                         mutableState.value = if (exitCode == 0) {
@@ -197,6 +212,7 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
             RuntimeResult.Success
         } catch (error: Throwable) {
             process = null
+            sessionJournal.clear()
             mutableActiveMachineId.value = null
             mutableState.value = RuntimeState.FAILED
             RuntimeResult.Failure(error.message ?: "Could not start the QEMU process.")
@@ -229,6 +245,7 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
                     child.waitFor()
                 }
                 if (process === child) process = null
+                sessionJournal.clear()
                 qmpSocketFor(machineId).delete()
                 mutableActiveMachineId.value = null
                 mutableState.value = RuntimeState.STOPPED
@@ -239,6 +256,35 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
                 RuntimeResult.Failure(it.message ?: "Could not stop QEMU.")
             }
         }
+    }
+
+    /** Detects a previous process death; it deliberately never auto-boots the guest. */
+    private fun recoverInterruptedSession() {
+        val previous = sessionJournal.read() ?: return
+        mutableState.value = RuntimeState.FAILED
+        appendConsoleLine("An earlier QORVEX session ended without a clean shutdown.")
+        appendConsoleLine("Automatic restart was skipped to avoid writing to a potentially inconsistent disk.")
+        val machine = VirtualMachineRepository(appContext).getAll()
+            .firstOrNull { it.id == previous.machineId }
+        if (machine == null) {
+            appendConsoleLine("Recovery check: the VM profile for the interrupted session was not found.")
+        } else {
+            val report = diskManager.verifyIntegrity(machine)
+            if (previous.diskCapacityBytes != machine.diskSizeGiB.toLong() * 1024L * 1024L * 1024L) {
+                appendConsoleLine("Recovery check: saved disk capacity does not match the VM profile.")
+            }
+            if (report.valid) {
+                val info = report.info
+                appendConsoleLine("Disk structure check passed: ${info?.capacityBytes} bytes logical, ${info?.allocatedBytes} bytes allocated.")
+                appendConsoleLine("The disk container is structurally accessible; guest filesystem consistency has not been verified.")
+            } else {
+                appendConsoleLine("Disk integrity check reported problems:")
+                report.issues.forEach { appendConsoleLine(" • $it") }
+            }
+        }
+        appendConsoleLine("Review the disk and guest state before manually starting this VM again.")
+        runCatching { sessionJournal.clear() }
+            .onFailure { appendConsoleLine("Could not clear the recovery marker: ${it.message}") }
     }
 
     private fun prepareFirmware(machine: VirtualMachine): Pair<File, File> {
