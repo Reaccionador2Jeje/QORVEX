@@ -265,7 +265,7 @@ private fun QorvexDashboard() {
                     Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("SERIAL CONSOLE", color = Color(0xFF67E8F9), fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         Text(
-                            consoleText.ifBlank { "Waiting for guest serial output..." },
+                            consoleText.lines().takeLast(18).joinToString("\n").ifBlank { "Waiting for guest serial output..." },
                             color = Color(0xFFB7F7D8),
                             fontSize = 10.sp,
                             lineHeight = 14.sp,
