@@ -34,7 +34,6 @@ make -C "$EDK2_DIR/BaseTools" -j"$(getconf _NPROCESSORS_ONLN)"
     cd "$EDK2_DIR"
     set +u
     source edksetup.sh
-    set -u
     build -a AARCH64 -t GCC5 -p ArmVirtPkg/ArmVirtQemu.dsc -b RELEASE
 )
 
