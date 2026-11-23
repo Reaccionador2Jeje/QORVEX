@@ -87,18 +87,16 @@ class VirtualDiskManager(context: Context) {
      */
     fun verifyIntegrity(machine: VirtualMachine): DiskIntegrityReport {
         val file = getDiskFile(machine)
-        val issues = mutableListOf<String>()
         val expectedCapacity = machine.diskSizeGiB.toLong() * GIB
-        if (!file.exists()) return DiskIntegrityReport(false, issues = listOf("Virtual disk is missing."))
-        if (!file.isFile) issues += "Virtual disk is not a regular file."
-        if (file.canonicalFile.parentFile != diskDirectory.canonicalFile) {
-            issues += "Virtual disk resolves outside its private storage directory."
-        }
-        if (file.length() != expectedCapacity) {
-            issues += "Virtual disk capacity mismatch: expected $expectedCapacity bytes, found ${file.length()} bytes."
-        }
-        if (!file.canRead()) issues += "Virtual disk is not readable."
-        if (!file.canWrite()) issues += "Virtual disk is not writable."
+        val facts = DiskIntegrityFacts(
+            expectedCapacityBytes = expectedCapacity,
+            actualCapacityBytes = file.length(),
+            isRegularFile = file.isFile,
+            isReadable = file.canRead(),
+            isWritable = file.canWrite(),
+            parentDirectoryMatches = file.canonicalFile.parentFile == diskDirectory.canonicalFile
+        )
+        val issues = VirtualDiskIntegrityValidator.validate(facts).toMutableList()
         val info = if (issues.isEmpty()) {
             runCatching { inspectFile(file) }.onFailure {
                 issues += "Could not inspect virtual disk allocation: ${it.message ?: "unknown error"}"
