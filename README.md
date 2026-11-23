@@ -1,44 +1,42 @@
 # QORVEX
 
-**QORVEX** is AtDev's Android PC virtualization and emulation platform, powered by QEMU.
+**QORVEX** is AtDev's Android PC emulation platform, designed around QEMU.
 
-Run virtual computers from Android with a purpose-built interface for machine configuration, virtual storage, installation media, input controls, and VM lifecycle management.
+> **Project status:** Early development. VM profiles, local sparse RAW disks, and ISO import into app-private storage are implemented. The ISO importer streams files, checks the reported size when available, and records a SHA-256 digest. The QEMU engine is not yet bundled, so guest boot is not available.
 
-> **Project status:** Early development. The Android dashboard, VM profiles, persisted ISO selection, app-private sparse RAW disk containers, and an NDK/JNI boundary scaffold are in place. QEMU itself is not bundled, and guest boot is not available yet.
+## Current capabilities
 
-## Project goals
-
-- Android-first experience with touch-friendly controls.
-- QEMU-backed virtual machines, starting with ARM64 guests on ARM64 Android devices.
-- Configurable virtual CPU, memory, storage, and boot media.
-- Persistent VM profiles and disk images.
-- Clear separation between the Android UI and the virtualization runtime.
-- Transparent reporting of device compatibility and runtime limitations.
+- Create, save, and delete VM profiles.
+- Configure ARM64 or x86_64 guest profiles, memory, CPU cores, and disk capacity.
+- Create sparse RAW disk containers without overwriting existing disks.
+- Inspect logical disk capacity and actual allocated storage blocks.
+- Select an installation image and copy it into QORVEX's private storage.
+- Record installation-image name and SHA-256 metadata.
 
 ## Architecture
 
 - **Android app:** Kotlin, Jetpack Compose, Android lifecycle and storage APIs.
-- **Runtime boundary:** Kotlin interface isolating UI from QEMU implementation.
-- **QEMU integration:** NDK/CMake and a JNI bridge scaffold are present; upstream QEMU still needs to be pinned, built, audited and linked.
-- **Guest firmware:** Firmware assets selected per supported machine architecture.
-- **VM storage:** App-private sparse RAW disk containers and persisted SAF installation-media references; import/export is still pending.
+- **VM profiles:** JSON-backed local profile persistence.
+- **Storage:** App-private sparse RAW disk images and imported installation media.
+- **Native boundary:** NDK/CMake JNI status library; this is not QEMU.
+- **QEMU integration:** Upstream QEMU still needs to be pinned, built for Android, linked, and tested.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Build
 
-The Android project uses Gradle and the Android Gradle Plugin.
+The Android project uses Gradle and the Android Gradle Plugin:
 
     gradle assembleDebug
 
-Open the repository in Android Studio to use the IDE-managed Gradle tooling.
+Open the repository in Android Studio to use IDE-managed Gradle tooling.
 
 ## Licensing
 
-QORVEX branding and original AtDev application code are maintained by AtDev. QEMU and any bundled third-party components remain subject to their respective licenses. In particular, QEMU is licensed under the GNU GPL; distribution must preserve applicable source-code, notice, and corresponding-license obligations. No proprietary relicensing of QEMU is implied.
+QORVEX branding and original AtDev application code are maintained by AtDev. QEMU and bundled third-party components remain subject to their respective licenses. QEMU is licensed under the GNU GPL; distribution must preserve applicable source-code, notice, and corresponding-license obligations. No proprietary relicensing of QEMU is implied.
 
 A complete third-party notices and compliance process is required before distributing builds containing QEMU.
 
-## Status
+## Release gate
 
-QORVEX is under active development. A successful Android UI build does not imply that a guest operating system can already boot on a physical device.
+A successful Android build does not mean QORVEX can boot a guest. The project must not be described as a working PC emulator until a guest has been booted and tested on a supported physical Android device.
