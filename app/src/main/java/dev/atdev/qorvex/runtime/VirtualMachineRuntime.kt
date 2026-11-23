@@ -197,7 +197,7 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
                     val exitCode = runCatching { child.waitFor() }.getOrDefault(-1)
                     if (process === child) {
                         process = null
-                        sessionJournal.clear()
+                        runCatching { sessionJournal.clear() }
                         qmpSocketFor(machine.id).delete()
                         mutableActiveMachineId.value = null
                         mutableState.value = if (exitCode == 0) {
@@ -212,7 +212,7 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
             RuntimeResult.Success
         } catch (error: Throwable) {
             process = null
-            sessionJournal.clear()
+            runCatching { sessionJournal.clear() }
             mutableActiveMachineId.value = null
             mutableState.value = RuntimeState.FAILED
             RuntimeResult.Failure(error.message ?: "Could not start the QEMU process.")
@@ -245,7 +245,7 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
                     child.waitFor()
                 }
                 if (process === child) process = null
-                sessionJournal.clear()
+                runCatching { sessionJournal.clear() }
                 qmpSocketFor(machineId).delete()
                 mutableActiveMachineId.value = null
                 mutableState.value = RuntimeState.STOPPED
