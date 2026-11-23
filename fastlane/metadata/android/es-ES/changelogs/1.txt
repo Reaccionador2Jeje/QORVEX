@@ -1,0 +1,1 @@
+Primera versión de desarrollo: runtime QEMU ARM64, perfiles de máquinas virtuales, discos virtuales, importación ISO, consola serial, servicio en primer plano y comprobaciones de sesiones interrumpidas.
