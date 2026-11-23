@@ -121,7 +121,7 @@ cp "$PREFIX/lib/libiconv.a" "$LLVM/sysroot/usr/lib/aarch64-linux-android/26/libi
 
 echo "Building GLib 2.84.4"
 fetch_tar https://download.gnome.org/sources/glib/2.84/glib-2.84.4.tar.xz glib.tar.xz glib-2.84.4
-(cd "$SRC/glib-2.82.5" && meson setup _build --cross-file "$WORK/cross.ini" --prefix "$PREFIX" --default-library static -Dselinux=disabled -Dlibmount=disabled && ninja -C _build -j"$JOBS" install)
+(cd "$SRC/glib-2.84.4" && meson setup _build --cross-file "$WORK/cross.ini" --prefix "$PREFIX" --default-library static -Dselinux=disabled -Dlibmount=disabled && ninja -C _build -j"$JOBS" install)
 
 echo "Building Pixman 0.44.2"
 fetch_tar https://cairographics.org/releases/pixman-0.44.2.tar.xz pixman.tar.xz pixman-0.44.2
