@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,10 +47,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import dev.atdev.qorvex.runtime.NativeQemuBridge
 import dev.atdev.qorvex.storage.InstallationMediaReader
+import dev.atdev.qorvex.storage.InstallationMediaManager
 import dev.atdev.qorvex.storage.VirtualDiskManager
 import dev.atdev.qorvex.vm.GuestArchitecture
 import dev.atdev.qorvex.vm.VirtualMachine
 import dev.atdev.qorvex.vm.VirtualMachineRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -80,19 +85,38 @@ private fun QorvexDashboard() {
     var notice by remember { mutableStateOf<String?>(null) }
     var mediaTargetId by remember { mutableStateOf<String?>(null) }
     val diskManager = remember { VirtualDiskManager(context) }
+    val mediaManager = remember { InstallationMediaManager(context) }
+    val scope = rememberCoroutineScope()
     val mediaPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         val targetId = mediaTargetId
         if (uri != null && targetId != null) {
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                val media = InstallationMediaReader.describe(context, uri)
-                val index = machines.indexOfFirst { it.id == targetId }
-                check(index >= 0) { "VM profile no longer exists." }
-                val updated = machines[index].copy(installationMediaUri = uri.toString())
-                repository.save(updated)
-                machines[index] = updated
-                notice = "Installation media linked: ${media.displayName}"
-            }.onFailure { notice = "Could not link file: ${it.message}" }
+            val machine = machines.firstOrNull { it.id == targetId }
+            if (machine == null) {
+                notice = "VM profile no longer exists."
+            } else {
+                notice = "Importing installation media into QORVEX storage..."
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            mediaManager.importMedia(machine, uri)
+                        }
+                    }.onSuccess { imported ->
+                        val index = machines.indexOfFirst { it.id == targetId }
+                        if (index >= 0) {
+                            val updated = machine.copy(
+                                installationMediaUri = null,
+                                installationMediaName = imported.displayName,
+                                installationMediaSha256 = imported.sha256
+                            )
+                            runCatching {
+                                repository.save(updated)
+                                machines[index] = updated
+                                notice = "ISO imported: ${imported.displayName} (${formatBytes(imported.sizeBytes)}). SHA-256: ${imported.sha256.take(16)}..."
+                            }.onFailure { notice = "ISO copied, but profile metadata could not be saved: ${it.message}" }
+                        }
+                    }.onFailure { notice = "ISO import failed: ${it.message}" }
+                }
+            }
         }
         mediaTargetId = null
     }
@@ -154,9 +178,11 @@ private fun QorvexDashboard() {
                 }
             } else {
                 machines.forEach { machine ->
-                    val mediaName = machine.installationMediaUri?.let { raw ->
+                    val mediaName = mediaManager.inspect(machine)?.let { imported ->
+                        "${imported.displayName} • ${formatBytes(imported.sizeBytes)} • SHA-256 verified"
+                    } ?: machine.installationMediaUri?.let { raw ->
                         runCatching { InstallationMediaReader.describe(context, Uri.parse(raw)).displayName }
-                            .getOrDefault("ISO linked (access unavailable)")
+                            .getOrDefault("Legacy ISO reference (re-import required)")
                     } ?: "No installation media"
                     MachineCard(
                         machine = machine,
