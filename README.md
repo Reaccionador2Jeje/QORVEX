@@ -4,7 +4,7 @@
 
 Run virtual computers from Android with a purpose-built interface for machine configuration, virtual storage, installation media, input controls, and VM lifecycle management.
 
-> **Project status:** Early scaffold. The Android shell is being established; QEMU runtime integration and on-device validation are not yet complete.
+> **Project status:** Early development. The Android dashboard, VM profile configuration, local profile storage, and runtime boundary are in place. QEMU runtime integration and on-device validation are not yet complete.
 
 ## Project goals
 
