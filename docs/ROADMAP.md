@@ -29,8 +29,8 @@
 - [ ] Boot and install an ARM64 guest on a physical Android device.
 
 ## Phase 3 — Runtime reliability
-- [ ] Move VM ownership into an Android foreground service.
-- [ ] Preserve VM state across activity recreation.
+- [x] Move VM runtime ownership into an Android foreground service with an ongoing notification.
+- [x] Preserve the shared runtime instance and observable state across Activity recreation/backgrounding.
 - [x] Add a QMP Unix-socket control channel and graceful shutdown request (fallback termination retained).
 - [ ] Add crash recovery and disk consistency checks.
 - [ ] Add observable boot/readiness states and actionable diagnostics.
