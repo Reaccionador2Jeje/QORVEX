@@ -28,6 +28,10 @@ git -C "$EDK2_DIR" checkout --detach "$EDK2_COMMIT"
 git -C "$EDK2_DIR" submodule sync --recursive
 git -C "$EDK2_DIR" submodule update --init --recursive
 
+python3 -m venv "$WORK/venv"
+"$WORK/venv/bin/python" -m pip install --disable-pip-version-check -r "$EDK2_DIR/pip-requirements.txt"
+export PATH="$WORK/venv/bin:$PATH"
+
 echo "Building AAVMF from EDK II commit $EDK2_COMMIT..."
 make -C "$EDK2_DIR/BaseTools" -j"$(getconf _NPROCESSORS_ONLN)"
 (
