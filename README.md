@@ -35,7 +35,7 @@ The Android app uses Kotlin, Jetpack Compose, and Gradle.
 
 The QEMU runtime is built separately for Android/Bionic ARM64 by `tools/build-qemu-android.sh`. It pins the Podroid QEMU build recipe, builds QEMU 11.1.2 and SLIRP, and checks the resulting ELF architecture and 16 KiB page alignment. UEFI firmware is built separately from the pinned EDK II source revision by `tools/build-aavmf-from-source.sh`; no prebuilt Debian firmware package is copied into the APK.
 
-Requirements for the current build scripts: Docker, Git, Python 3 with `venv` and `pip`, GCC, Make, NASM, ACPICA (`iasl`), UUID development headers, and `readelf`.
+Requirements for the current build scripts: a Linux x86_64 host, Git, curl, Python 3 with `venv` and `pip`, GCC/G++, Make, Ninja, Meson, Autoconf/Automake/Libtool, NASM, ACPICA (`iasl`), UUID development headers, `patchelf`, and `readelf`. The QEMU runtime build no longer requires Docker.
 
 ```bash
 bash tools/build-qemu-android.sh
