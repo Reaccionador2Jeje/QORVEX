@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: qorvex-android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-qemu-runtime:
     name: Build QEMU 11.1.2 for Android ARM64
@@ -59,6 +63,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: Install Android SDK components
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
