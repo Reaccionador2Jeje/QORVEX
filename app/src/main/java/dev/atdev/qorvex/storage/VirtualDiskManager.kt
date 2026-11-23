@@ -14,6 +14,12 @@ data class VirtualDiskInfo(
     val allocatedBytes: Long
 )
 
+data class DiskIntegrityReport(
+    val valid: Boolean,
+    val info: VirtualDiskInfo? = null,
+    val issues: List<String> = emptyList()
+)
+
 /**
  * Creates and inspects sparse RAW disk containers in app-private storage.
  *
@@ -73,6 +79,32 @@ class VirtualDiskManager(context: Context) {
             temporary.delete()
             throw error
         }
+    }
+
+    /**
+     * Checks the existing disk container without modifying it. This is a
+     * structural consistency check, not a filesystem-level guest repair tool.
+     */
+    fun verifyIntegrity(machine: VirtualMachine): DiskIntegrityReport {
+        val file = getDiskFile(machine)
+        val issues = mutableListOf<String>()
+        val expectedCapacity = machine.diskSizeGiB.toLong() * GIB
+        if (!file.exists()) return DiskIntegrityReport(false, issues = listOf("Virtual disk is missing."))
+        if (!file.isFile) issues += "Virtual disk is not a regular file."
+        if (file.canonicalFile.parentFile != diskDirectory.canonicalFile) {
+            issues += "Virtual disk resolves outside its private storage directory."
+        }
+        if (file.length() != expectedCapacity) {
+            issues += "Virtual disk capacity mismatch: expected $expectedCapacity bytes, found ${file.length()} bytes."
+        }
+        if (!file.canRead()) issues += "Virtual disk is not readable."
+        if (!file.canWrite()) issues += "Virtual disk is not writable."
+        val info = if (issues.isEmpty()) {
+            runCatching { inspectFile(file) }.onFailure {
+                issues += "Could not inspect virtual disk allocation: ${it.message ?: "unknown error"}"
+            }.getOrNull()
+        } else null
+        return DiskIntegrityReport(issues.isEmpty() && info != null, info, issues)
     }
 
     /** Returns null when this VM has no disk file. */
