@@ -334,7 +334,7 @@ private fun MachineCard(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onCreateDisk) { Text(if (diskInfo != null) "Verify disk" else "Create disk") }
-                OutlinedButton(onClick = onDelete) { Text("Delete profile") }
+                OutlinedButton(onClick = onDelete, enabled = !isRunning) { Text("Delete profile") }
             }
         }
     }
