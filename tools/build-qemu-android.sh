@@ -225,7 +225,8 @@ sed -i 's/\bsiglongjmp(/_qemu_longjmp(/g' "$QEMU_DIR/util/coroutine-ucontext.c"
 
 sed -i 's@^    rc = libusb_init(&ctx);@#if defined(__ANDROID__)\n    libusb_set_option(NULL, LIBUSB_OPTION_NO_DEVICE_DISCOVERY);\n#endif\n    rc = libusb_init(\&ctx);@' "$QEMU_DIR/hw/usb/host-libusb.c"
 grep -q LIBUSB_OPTION_NO_DEVICE_DISCOVERY "$QEMU_DIR/hw/usb/host-libusb.c"
-sed -i 's@^    udev = speed_map\[libusb_speed\];@#if defined(__ANDROID__)\n    if (libusb_speed == LIBUSB_SPEED_UNKNOWN) { libusb_speed = s->ddesc.bcdUSB >= 0x0300 ? LIBUSB_SPEED_SUPER : s->ddesc.bMaxPacketSize0 == 64 ? LIBUSB_SPEED_HIGH : LIBUSB_SPEED_FULL; }\n#endif\n    udev = speed_map[libusb_speed];@' "$QEMU_DIR/hw/usb/host-libusb.c"
+sed -i 's@^    udev->speed = speed_map\[libusb_speed\];@#if defined(__ANDROID__)\n    if (libusb_speed == LIBUSB_SPEED_UNKNOWN) {\n        libusb_speed = s->ddesc.bcdUSB >= 0x0300 ? LIBUSB_SPEED_SUPER\n                     : s->ddesc.bMaxPacketSize0 == 64 ? LIBUSB_SPEED_HIGH\n                     : LIBUSB_SPEED_FULL;\n    }\n#endif\n    udev->speed = speed_map[libusb_speed];@' "$QEMU_DIR/hw/usb/host-libusb.c"
+grep -q 'Host kernels < 4.14 cannot report speed' "$QEMU_DIR/hw/usb/host-libusb.c"
 
 (
  cd "$QEMU_DIR"
