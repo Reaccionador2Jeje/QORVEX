@@ -15,6 +15,7 @@ data class VirtualMachine(
     val memoryMiB: Int,
     val cpuCores: Int,
     val diskSizeGiB: Int,
+    val installationMediaUri: String? = null,
     val createdAtEpochMs: Long = System.currentTimeMillis()
 ) {
     init {
@@ -31,6 +32,7 @@ data class VirtualMachine(
         .put("memoryMiB", memoryMiB)
         .put("cpuCores", cpuCores)
         .put("diskSizeGiB", diskSizeGiB)
+        .put("installationMediaUri", installationMediaUri)
         .put("createdAtEpochMs", createdAtEpochMs)
 
     companion object {
@@ -41,6 +43,7 @@ data class VirtualMachine(
             memoryMiB = json.getInt("memoryMiB"),
             cpuCores = json.getInt("cpuCores"),
             diskSizeGiB = json.getInt("diskSizeGiB"),
+            installationMediaUri = json.optString("installationMediaUri").takeIf { it.isNotBlank() && it != "null" },
             createdAtEpochMs = json.getLong("createdAtEpochMs")
         )
     }
