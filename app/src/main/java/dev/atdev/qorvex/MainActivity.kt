@@ -1,6 +1,9 @@
 package dev.atdev.qorvex
 
 import android.os.Bundle
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -94,6 +97,7 @@ private fun QorvexDashboard() {
     val activeMachineId by runtime.activeMachineId.collectAsState()
     val consoleText by runtime.consoleText.collectAsState()
     val runtimeCapabilities = remember { runtime.getCapabilities() }
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     val mediaPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         val targetId = mediaTargetId
         if (uri != null && targetId != null) {
@@ -211,6 +215,11 @@ private fun QorvexDashboard() {
                         },
                         isRunning = activeMachineId == machine.id,
                         onStart = {
+                            if (Build.VERSION.SDK_INT >= 33 &&
+                                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
                             scope.launch {
                                 runCatching {
                                     QorvexRuntimeService.start(context)
