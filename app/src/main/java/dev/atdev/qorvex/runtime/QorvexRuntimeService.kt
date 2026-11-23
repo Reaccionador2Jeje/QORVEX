@@ -26,6 +26,8 @@ import kotlinx.coroutines.launch
 class QorvexRuntimeService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var runtime: QemuProcessRuntime
+    private var isForeground = false
+    private var observedActiveSession = false
     private val notifications by lazy {
         getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     }
@@ -37,8 +39,22 @@ class QorvexRuntimeService : Service() {
         serviceScope.launch {
             combine(runtime.state, runtime.activeMachineId) { state, machineId -> state to machineId }
                 .collect { (state, machineId) ->
+                    if (state == RuntimeState.STARTING ||
+                        state == RuntimeState.RUNNING ||
+                        state == RuntimeState.STOPPING
+                    ) {
+                        observedActiveSession = true
+                    }
                     if (isForeground) {
                         notifications.notify(NOTIFICATION_ID, buildNotification(state, machineId))
+                    }
+                    val finished = state == RuntimeState.STOPPED ||
+                        state == RuntimeState.EXITED ||
+                        state == RuntimeState.FAILED
+                    if (isForeground && observedActiveSession && finished) {
+                        isForeground = false
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
                     }
                 }
         }
@@ -121,7 +137,6 @@ class QorvexRuntimeService : Service() {
         private const val ACTION_STOP = "dev.atdev.qorvex.action.STOP_RUNTIME"
         private const val EXTRA_MACHINE_ID = "machine_id"
         @Volatile private var sharedRuntime: QemuProcessRuntime? = null
-        @Volatile private var isForeground = false
 
         fun getRuntime(context: Context): QemuProcessRuntime =
             sharedRuntime ?: synchronized(this) {
