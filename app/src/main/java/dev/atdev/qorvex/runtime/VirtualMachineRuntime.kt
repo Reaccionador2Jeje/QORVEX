@@ -17,6 +17,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 enum class RuntimeAvailability {
@@ -228,7 +229,7 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
             }
         }
 
-        val vars = File(directory, "AAVMF_VARS-${machine.id}.fd")
+        val vars = File(directory, "AAVMF_VARS-${safeMachineKey(machine.id)}.fd")
         if (!vars.isFile) {
             appContext.assets.open(FIRMWARE_VARS_ASSET).use { input ->
                 vars.outputStream().use { output -> input.copyTo(output) }
@@ -236,6 +237,11 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
         }
         return code to vars
     }
+
+    private fun safeMachineKey(id: String): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(id.toByteArray(Charsets.UTF_8))
+            .joinToString("") { byte -> "%02x".format(byte) }
 
     @Synchronized
     private fun appendConsoleLine(line: String) {
