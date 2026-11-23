@@ -50,30 +50,41 @@ docker run --rm \
       cp /usr/share/doc/qemu-efi-aarch64/copyright /out/EDK2-COPYRIGHT
     '
 
-echo "Checking QEMU ELF architecture and Android 16 KiB page alignment..."
-python3 - "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so" <<'PY'
+echo "Checking QEMU and SLIRP ELF architecture and Android 16 KiB page alignment..."
+python3 - "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so" "$OUT/jniLibs/arm64-v8a/libslirp.so" <<'PY'
 import struct
 import sys
 
-path = sys.argv[1]
-data = open(path, "rb").read()
-if data[:4] != b"\x7fELF" or data[4] != 2 or data[5] != 1:
-    raise SystemExit("QEMU artifact is not a little-endian ELF64 binary")
-machine = struct.unpack_from("<H", data, 18)[0]
-if machine != 183:
-    raise SystemExit(f"Expected ELF AArch64 (183), got e_machine={machine}")
-phoff = struct.unpack_from("<Q", data, 32)[0]
-phentsize = struct.unpack_from("<H", data, 54)[0]
-phnum = struct.unpack_from("<H", data, 56)[0]
-alignments = []
-for index in range(phnum):
-    offset = phoff + index * phentsize
-    p_type = struct.unpack_from("<I", data, offset)[0]
-    if p_type == 1:
-        alignments.append(struct.unpack_from("<Q", data, offset + 48)[0])
-if not alignments or any(value < 16384 for value in alignments):
-    raise SystemExit(f"QEMU ELF LOAD segments are not 16 KiB aligned: {alignments}")
-print(f"Verified AArch64 ELF; LOAD alignments: {alignments}")
+for path in sys.argv[1:]:
+    data = open(path, "rb").read()
+    if data[:4] != b"\\x7fELF" or data[4] != 2 or data[5] != 1:
+        raise SystemExit(f"{path}: not a little-endian ELF64 binary")
+    elf_type = struct.unpack_from("<H", data, 16)[0]
+    machine = struct.unpack_from("<H", data, 18)[0]
+    if machine != 183:
+        raise SystemExit(f"{path}: expected ELF AArch64 (183), got e_machine={machine}")
+    is_qemu = path.endswith("libqemu-system-aarch64.so")
+    if is_qemu and elf_type != 3:
+        raise SystemExit(f"{path}: QEMU must be a PIE executable (ET_DYN)")
+    phoff = struct.unpack_from("<Q", data, 32)[0]
+    phentsize = struct.unpack_from("<H", data, 54)[0]
+    phnum = struct.unpack_from("<H", data, 56)[0]
+    alignments = []
+    interpreter = None
+    for index in range(phnum):
+        offset = phoff + index * phentsize
+        p_type = struct.unpack_from("<I", data, offset)[0]
+        if p_type == 1:
+            alignments.append(struct.unpack_from("<Q", data, offset + 48)[0])
+        elif p_type == 3:
+            p_offset = struct.unpack_from("<Q", data, offset + 8)[0]
+            p_filesz = struct.unpack_from("<Q", data, offset + 32)[0]
+            interpreter = data[p_offset:p_offset + p_filesz].rstrip(b"\\0").decode()
+    if not alignments or any(value < 16384 for value in alignments):
+        raise SystemExit(f"{path}: LOAD segments are not 16 KiB aligned: {alignments}")
+    if is_qemu and interpreter != "/system/bin/linker64":
+        raise SystemExit(f"{path}: expected Android linker64, got {interpreter!r}")
+    print(f"Verified {path}: AArch64, 16 KiB aligned, interpreter={interpreter}")
 PY
 
 test -s "$OUT/jniLibs/arm64-v8a/libslirp.so"
