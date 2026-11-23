@@ -17,21 +17,21 @@
 
 ## Phase 2 — QEMU ARM64 runtime
 - [x] Pin upstream QEMU 11.1.2 through the Android build recipe.
-- [ ] Build QEMU for Android/Bionic ARM64 with TCG (CI build not yet verified).
-- [ ] Package QEMU executable and SLIRP dependency in the APK (awaiting successful CI artifact).
-- [ ] Package AAVMF UEFI code and per-VM variable-store template (awaiting successful CI artifact).
+- [x] Build QEMU for Android/Bionic ARM64 with TCG (verified in GitHub Actions).
+- [x] Package QEMU executable and SLIRP dependency in the APK (verified in GitHub Actions).
+- [x] Package AAVMF UEFI code and per-VM variable-store template (verified in GitHub Actions).
 - [x] Generate launch arguments for the ARM64 `virt` machine.
 - [x] Attach app-private RAW disk and optional installation ISO.
 - [x] Add SLIRP user-mode networking.
 - [x] Start and stop a QEMU child process.
 - [x] Capture QEMU serial output in the app.
-- [ ] Verify the complete QEMU build and APK pipeline in CI.
+- [x] Verify the complete QEMU build, unit tests, and APK pipeline in GitHub Actions.
 - [ ] Boot and install an ARM64 guest on a physical Android device.
 
 ## Phase 3 — Runtime reliability
 - [ ] Move VM ownership into an Android foreground service.
 - [ ] Preserve VM state across activity recreation.
-- [ ] Add graceful QMP shutdown and monitor support.
+- [x] Add a QMP Unix-socket control channel and graceful shutdown request (fallback termination retained).
 - [ ] Add crash recovery and disk consistency checks.
 - [ ] Add observable boot/readiness states and actionable diagnostics.
 - [ ] Add automated process lifecycle tests.
