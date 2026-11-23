@@ -142,7 +142,7 @@ private fun QorvexDashboard() {
                     Text("QORVEX", color = Color(0xFF67E8F9), fontSize = 28.sp, fontWeight = FontWeight.Black)
                     Text("ATDEV • VIRTUAL PC", color = Color(0xFF94A3B8), fontSize = 11.sp, letterSpacing = 2.sp)
                 }
-                Text("0.3.0-dev", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                Text("0.4.0-dev", color = Color(0xFF94A3B8), fontSize = 12.sp)
             }
 
             Card(
