@@ -3,24 +3,28 @@
 ## Phase 0 — Repository foundation
 - [x] Establish project identity and repository.
 - [x] Document architecture and licensing boundary.
-- [ ] Establish Android build pipeline.
+- [x] Establish Android Gradle project and CI build workflow.
 - [ ] Add contribution and third-party notice policies.
 
 ## Phase 1 — Android application shell
-- [ ] Main dashboard and navigation.
-- [ ] VM profile data model.
-- [ ] Create/edit VM configuration screens.
-- [ ] Empty states and error handling.
+- [x] Main dashboard.
+- [x] VM profile data model.
+- [x] Create VM configuration screen.
+- [x] Local persistence for VM profiles.
+- [x] Delete saved VM profiles.
+- [ ] Import installation media through Android's Storage Access Framework.
 - [ ] Basic UI tests.
 
 ## Phase 2 — Runtime abstraction
-- [ ] Define runtime and capability interfaces.
-- [ ] Implement a mock runtime for UI development.
-- [ ] Add lifecycle state machine.
+- [x] Define runtime and capability interfaces.
+- [x] Add explicit not-installed runtime implementation.
+- [ ] Implement a mock runtime for UI lifecycle testing.
+- [ ] Add observable VM lifecycle state machine.
 - [ ] Add serial console event model.
 
 ## Phase 3 — QEMU integration
 - [ ] Select and pin an upstream QEMU version.
+- [ ] Audit Android-compatible build dependencies and licenses.
 - [ ] Build QEMU for supported Android ABIs.
 - [ ] Package required native libraries and firmware.
 - [ ] Implement JNI boundary.
