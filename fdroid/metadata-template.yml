@@ -1,0 +1,32 @@
+# DRAFT TEMPLATE ONLY.
+# Copy and adapt this into the official fdroiddata repository only after
+# the offline build, stable release, license audit, and device tests pass.
+#
+# Do not submit this template as-is.
+#
+# Categories:
+#   - System
+# License: Apache-2.0
+# AuthorName: AtDev
+# SourceCode: https://github.com/Reaccionador2Jeje/QORVEX
+# IssueTracker: https://github.com/Reaccionador2Jeje/QORVEX/issues
+# Summary: ARM64 virtual machine manager for Android
+# Description: |-
+#   QORVEX manages ARM64 virtual machines on Android using QEMU.
+#   It currently provides a serial console and software emulation.
+#   Graphical display and touch input are not yet available.
+#   QORVEX does not bundle guest operating systems.
+# RepoType: git
+# Repo: https://github.com/Reaccionador2Jeje/QORVEX.git
+#
+# Builds:
+#   - versionName: <stable-version>
+#     versionCode: <stable-version-code>
+#     commit: <full-immutable-release-commit>
+#     submodules: true
+#     # Add the verified, network-free build recipe only after it exists.
+#
+# AutoUpdateMode: None
+# UpdateCheckMode: None
+# CurrentVersion: <stable-version>
+# CurrentVersionCode: <stable-version-code>
