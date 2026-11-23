@@ -1,0 +1,1 @@
+Ejecuta máquinas virtuales ARM64 en Android con QEMU
