@@ -26,7 +26,7 @@ jobs:
       - name: Install EDK II firmware build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends acpica-tools nasm uuid-dev
+          sudo apt-get install -y --no-install-recommends acpica-tools nasm uuid-dev python3-venv
 
       - name: Build QEMU and source-build ARM64 UEFI firmware
         run: bash tools/build-qemu-android.sh
