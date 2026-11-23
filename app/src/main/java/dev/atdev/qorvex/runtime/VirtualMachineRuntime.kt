@@ -30,7 +30,7 @@ sealed interface RuntimeResult {
 class QemuRuntimeNotInstalled : VirtualMachineRuntime {
     override fun getCapabilities() = RuntimeCapabilities(
         availability = RuntimeAvailability.NOT_INSTALLED,
-        detail = "The QEMU native runtime has not been integrated into this build yet."
+        detail = NativeQemuBridge.status + " QEMU itself is not linked; guest boot remains disabled."
     )
 
     override suspend fun start(machine: VirtualMachine) = RuntimeResult.Failure(
