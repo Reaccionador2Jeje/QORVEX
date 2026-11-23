@@ -18,6 +18,7 @@ class QemuCommandBuilderTest {
         val iso = File(directory, "installer image.iso").apply { writeText("iso") }
         val code = File(directory, "AAVMF_CODE.fd").apply { writeText("code") }
         val vars = File(directory, "AAVMF_VARS.fd").apply { writeText("vars") }
+        val qmp = File(directory, "qmp.sock")
         val machine = VirtualMachine(
             name = "Test VM",
             architecture = GuestArchitecture.AARCH64,
@@ -26,7 +27,7 @@ class QemuCommandBuilderTest {
             diskSizeGiB = 16
         )
 
-        val args = QemuCommandBuilder.build(executable, machine, disk, iso, code, vars)
+        val args = QemuCommandBuilder.build(executable, machine, disk, iso, code, vars, qmp)
 
         assertEquals(executable.absolutePath, args.first())
         assertTrue(args.containsAll(listOf("-machine", "virt,gic-version=3")))
@@ -38,6 +39,7 @@ class QemuCommandBuilderTest {
         assertTrue(args.any { it.contains(code.absolutePath) })
         assertTrue(args.any { it.contains(vars.absolutePath) })
         assertTrue(args.containsAll(listOf("-serial", "stdio", "-monitor", "none")))
+        assertTrue(args.containsAll(listOf("-qmp", "unix:${qmp.absolutePath},server=on,wait=off")))
         assertFalse(args.any { it == "mon:stdio" })
     }
 
