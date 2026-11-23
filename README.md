@@ -1,54 +1,57 @@
 # QORVEX
 
-**QORVEX** is AtDev's Android PC emulation platform, powered by upstream QEMU.
+**QORVEX** is an open-source Android ARM64 virtual-machine manager powered by QEMU.
 
-## Runtime target
+It lets you create VM profiles, prepare virtual disks, import installation media, and launch ARM64 guest systems on compatible ARM64 Android devices. QEMU uses TCG software emulation; root access and KVM are not required.
 
-The first packaged runtime targets **ARM64 Android devices running ARM64 guests**. QEMU uses TCG software emulation, so it does not require root or KVM. Hardware acceleration is not enabled.
-
-The Android CI pipeline builds QEMU 11.1.2 for Android/Bionic, packages the ARM64 executable and SLIRP networking library, adds AAVMF UEFI firmware, and then builds the APK. The executable is packaged in the app's native library directory and launched as a child process; it is not loaded as a JNI shared library.
-
-## Implemented
+## Current capabilities
 
 - Create, save, and delete VM profiles.
 - Configure guest memory, CPU cores, and virtual disk capacity.
 - Create sparse RAW disk images in app-private storage.
-- Inspect logical disk capacity and actual allocated storage blocks.
+- Inspect disk capacity and allocated storage.
 - Import ISO images into app-private storage and record SHA-256 metadata.
-- Launch the QEMU ARM64 system emulator with a `virt` machine, TCG, UEFI pflash, virtio disk, optional installation CD-ROM, and SLIRP user networking.
-- Start and stop one QEMU process from the dashboard.
-- Capture QEMU's serial output in the in-app console.
+- Launch QEMU ARM64 guests using the generic `virt` machine and UEFI firmware.
+- Attach a virtio virtual disk and optional read-only installation ISO.
+- Provide SLIRP user-mode networking.
+- Capture serial output in the in-app console.
+- Keep an active QEMU process supervised by an Android foreground service with a persistent notification and a Stop VM action.
+- Request graceful shutdown through QMP, with process termination as a fallback.
+- Detect interrupted VM sessions and perform non-destructive virtual-disk container checks before a manual restart.
 
 ## Current limitations
 
-- ARM64 guests only. x86_64 profiles can be saved but cannot boot in this runtime.
-- The first frontend is serial-console only. A graphical framebuffer, touch keyboard, and pointer integration are not implemented yet.
-- QEMU runs in the app process lifecycle; a foreground service for long-running/background VMs is still needed.
-- Guest boot success depends on the selected ISO being compatible with the ARM64 `virt` machine and UEFI firmware.
-- CI must successfully build and package QEMU before the APK contains the engine. A local `gradle assembleDebug` without running the QEMU build script creates an APK without QEMU.
+- ARM64 guests only. x86_64 profiles cannot boot with the current runtime.
+- The frontend is serial-console only. A graphical framebuffer, touch keyboard, and pointer integration are not implemented.
+- Audio, pause/resume, snapshots, and interactive QMP management are not implemented.
+- Disk checks validate the container file and its storage properties; they do not inspect or repair the guest filesystem.
+- TCG is software emulation and can be slow, especially on entry-level devices.
+- Guest boot depends on the selected ISO supporting the ARM64 QEMU `virt` machine and UEFI firmware.
+- Physical-device compatibility testing is still required before calling this a stable release.
 
-## Build the QEMU runtime locally
+## Build
 
-Requirements: Docker, Git, Python 3, and readelf.
+The Android app uses Kotlin, Jetpack Compose, and Gradle.
 
-    bash tools/build-qemu-android.sh
-    gradle testDebugUnitTest
-    gradle assembleDebug
+The QEMU runtime is built separately for Android/Bionic ARM64 by `tools/build-qemu-android.sh`. That script pins the Podroid build recipe to an immutable Git commit, builds QEMU 11.1.2 and SLIRP, obtains AAVMF firmware from Debian Bookworm, and checks the resulting ELF architecture and 16 KiB page alignment.
 
-The build script checks that the resulting executable is AArch64 ELF and that its load segments are aligned for 16 KiB Android pages.
+Requirements for the current QEMU build script: Docker, Git, Python 3, and `readelf`.
 
-## Architecture
+```bash
+bash tools/build-qemu-android.sh
+gradle testDebugUnitTest
+gradle assembleDebug
+```
 
-- **Android app:** Kotlin, Jetpack Compose, Android storage and process APIs.
-- **VM storage:** app-private sparse RAW disks and imported installation media.
-- **QEMU:** upstream QEMU 11.1.2, built for Android ARM64 with TCG.
-- **Firmware:** AAVMF_CODE and per-VM AAVMF_VARS from Debian's `qemu-efi-aarch64` package.
-- **Networking:** QEMU SLIRP user-mode networking.
+A plain Gradle build without first producing and packaging the QEMU runtime does not create a complete emulator APK. The GitHub Actions workflow builds the runtime, runs the unit tests, and then packages the APK.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ROADMAP.md](docs/ROADMAP.md), and [docs/THIRD-PARTY-LICENSES.md](docs/THIRD-PARTY-LICENSES.md).
+## Architecture and licensing
 
-## Licensing
+- Android application: Apache-2.0.
+- QEMU 11.1.2: GPL-2.0.
+- Firmware: EDK II/AAVMF, with the Debian package copyright notice.
+- Native build recipe: ExTV/Podroid at the pinned commit documented in `docs/THIRD-PARTY-LICENSES.md`.
 
-QORVEX branding and original AtDev application code are maintained by AtDev. QEMU is GPL-2.0; its corresponding source and applicable build patches must accompany distributed QEMU binaries. EDK II firmware and the Android build recipe have their own notices. See the third-party license record before redistributing builds.
+QORVEX does not claim ownership of QEMU, SLIRP, or EDK II. Corresponding source, build patches, and required notices must accompany redistribution of the relevant binaries. See [the third-party license record](docs/THIRD-PARTY-LICENSES.md).
 
-QORVEX must not be described as a complete graphical PC emulator until graphical display and input have been implemented and guest boot has been tested on a physical Android device.
+See [the architecture](docs/ARCHITECTURE.md) and [the roadmap](docs/ROADMAP.md) for implementation details.
