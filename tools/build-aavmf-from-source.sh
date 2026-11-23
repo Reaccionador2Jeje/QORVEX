@@ -45,14 +45,14 @@ export PATH="$WORK/venv/bin:$PATH"
 # defaults may interpret () as a zero-argument prototype, breaking its
 # generic callback calls. Keep this compatibility scoped to PCCTS tools.
 for pccts_makefile in \
-    "$EDK2_DIR/BaseTools/Source/C/VfrCompile/Pccts/dlg/makefile1" \
-    "$EDK2_DIR/BaseTools/Source/C/VfrCompile/Pccts/antlr/makefile1"; do
+    "$EDK2_DIR/BaseTools/Source/C/VfrCompile/Pccts/dlg/makefile" \
+    "$EDK2_DIR/BaseTools/Source/C/VfrCompile/Pccts/antlr/makefile"; do
     [ -f "$pccts_makefile" ] || {
         echo "Missing expected PCCTS makefile: $pccts_makefile" >&2
         exit 1
     }
     if ! grep -q -- "-std=gnu17" "$pccts_makefile"; then
-        sed -i '/^CFLAGS=/ s/$/ -std=gnu17/' "$pccts_makefile"
+        sed -i '/^BUILD_CFLAGS=/ s/$/ -std=gnu17/' "$pccts_makefile"
     fi
 done
 
