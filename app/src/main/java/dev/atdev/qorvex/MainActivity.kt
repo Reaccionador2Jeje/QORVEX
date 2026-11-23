@@ -161,7 +161,7 @@ private fun QorvexDashboard() {
                     MachineCard(
                         machine = machine,
                         mediaName = mediaName,
-                        diskExists = diskManager.inspect(machine) != null,
+                        diskInfo = runCatching { diskManager.inspect(machine) }.getOrNull(),
                         onSelectMedia = {
                             mediaTargetId = machine.id
                             mediaPicker.launch(arrayOf("application/x-iso9660-image", "application/octet-stream", "*/*"))
@@ -224,7 +224,7 @@ private fun QorvexDashboard() {
 private fun MachineCard(
     machine: VirtualMachine,
     mediaName: String,
-    diskExists: Boolean,
+    diskInfo: dev.atdev.qorvex.storage.VirtualDiskInfo?,
     onDelete: () -> Unit,
     onStart: () -> Unit,
     onSelectMedia: () -> Unit,
@@ -243,13 +243,21 @@ private fun MachineCard(
             Text(machine.architecture.label, color = Color(0xFF94A3B8), fontSize = 13.sp)
             Text("${machine.memoryMiB} MiB RAM  •  ${machine.cpuCores} CPU cores  •  ${machine.diskSizeGiB} GiB disk", color = Color(0xFFCBD5E1), fontSize = 12.sp)
             Text("Media: $mediaName", color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 2)
-            Text(if (diskExists) "Virtual disk: created" else "Virtual disk: not created", color = if (diskExists) Color(0xFF86EFAC) else Color(0xFF94A3B8), fontSize = 11.sp)
+            if (diskInfo != null) {
+                Text(
+                    "Virtual disk: ${formatBytes(diskInfo.capacityBytes)} capacity • ${formatBytes(diskInfo.allocatedBytes)} allocated",
+                    color = Color(0xFF86EFAC),
+                    fontSize = 11.sp
+                )
+            } else {
+                Text("Virtual disk: not created", color = Color(0xFF94A3B8), fontSize = 11.sp)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onStart) { Text("Start") }
                 OutlinedButton(onClick = onSelectMedia) { Text("Select ISO") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onCreateDisk) { Text(if (diskExists) "Verify disk" else "Create disk") }
+                OutlinedButton(onClick = onCreateDisk) { Text(if (diskInfo != null) "Verify disk" else "Create disk") }
                 OutlinedButton(onClick = onDelete) { Text("Delete profile") }
             }
         }
@@ -318,6 +326,18 @@ private fun CreateMachineDialog(onDismiss: () -> Unit, onCreate: (VirtualMachine
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
+}
+
+private fun formatBytes(bytes: Long): String {
+    if (bytes < 1024L) return "$bytes B"
+    val units = listOf("KiB", "MiB", "GiB", "TiB")
+    var value = bytes.toDouble()
+    var unit = -1
+    while (value >= 1024.0 && unit < units.lastIndex) {
+        value /= 1024.0
+        unit++
+    }
+    return String.format(java.util.Locale.ROOT, "%.1f %s", value, units[unit])
 }
 
 @Composable
