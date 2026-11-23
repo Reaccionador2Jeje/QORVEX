@@ -140,13 +140,25 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
                 }
 
                 val firmware = prepareFirmware(machine)
+                val qmpSocket = qmpSocketFor(machine.id).apply {
+                    parentFile?.let { directory ->
+                        check(directory.isDirectory || directory.mkdirs()) {
+                            "Could not create the QMP socket directory."
+                        }
+                    }
+                    delete()
+                }
+                check(qmpSocket.absolutePath.toByteArray(Charsets.UTF_8).size < 100) {
+                    "The QMP socket path is too long for an Android local socket."
+                }
                 val command = QemuCommandBuilder.build(
                     executable = qemuExecutable,
                     machine = machine,
                     disk = disk,
                     installationMedia = media,
                     firmwareCode = firmware.first,
-                    firmwareVars = firmware.second
+                    firmwareVars = firmware.second,
+                    qmpSocket = qmpSocket
                 )
                 val child = ProcessBuilder(command)
                     .directory(appContext.filesDir)
@@ -171,6 +183,7 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
                     val exitCode = runCatching { child.waitFor() }.getOrDefault(-1)
                     if (process === child) {
                         process = null
+                        qmpSocketFor(machine.id).delete()
                         mutableActiveMachineId.value = null
                         mutableState.value = if (exitCode == 0) {
                             RuntimeState.EXITED
@@ -201,12 +214,22 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
         mutableState.value = RuntimeState.STOPPING
         return withContext(Dispatchers.IO) {
             runCatching {
-                child.destroy()
+                val qmpSocket = qmpSocketFor(machineId)
+                val gracefulShutdownSent = withContext(Dispatchers.IO) {
+                    QmpClient.requestQuit(qmpSocket)
+                }
+                if (!gracefulShutdownSent) {
+                    appendConsoleLine("QMP graceful shutdown unavailable; using process termination.")
+                }
                 if (!child.waitFor(STOP_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    child.destroy()
+                }
+                if (child.isAlive) {
                     child.destroyForcibly()
                     child.waitFor()
                 }
                 if (process === child) process = null
+                qmpSocketFor(machineId).delete()
                 mutableActiveMachineId.value = null
                 mutableState.value = RuntimeState.STOPPED
                 appendConsoleLine("QEMU stopped.")
@@ -237,6 +260,9 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
         }
         return code to vars
     }
+
+    private fun qmpSocketFor(machineId: String): File =
+        File(File(appContext.filesDir, "qmp"), "${safeMachineKey(machineId)}.sock")
 
     private fun safeMachineKey(id: String): String =
         MessageDigest.getInstance("SHA-256")
