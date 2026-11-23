@@ -75,7 +75,7 @@ private fun QorvexDashboard() {
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "Create virtual machines, configure hardware, and run guest operating systems from Android.",
-                        color = Color(0xFFB6C7D9), fontSize = 14.sp, lineHeight = 21.sp
+                        color = Color(0xFFB6C7D9), fontSize = 14.sp, style = androidx.compose.ui.text.TextStyle(lineHeight = 21.sp)
                     )
                     Spacer(Modifier.height(18.dp))
                     Button(onClick = { }) { Text("Create your first VM") }
