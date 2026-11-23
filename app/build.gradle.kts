@@ -15,14 +15,11 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    buildFeatures { compose = true }
-
-    defaultConfig {
         ndk { abiFilters += listOf("arm64-v8a") }
         externalNativeBuild { cmake { cppFlags += "-std=c++17" } }
     }
+
+    buildFeatures { compose = true }
 
     ndkVersion = "27.2.12479018"
     externalNativeBuild {
