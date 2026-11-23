@@ -1,0 +1,24 @@
+QORVEX is an open-source virtual-machine manager for ARM64 Android devices, powered by QEMU.
+
+FEATURES
+• Create and manage virtual-machine profiles
+• Configure guest memory, CPU cores, and virtual disk capacity
+• Create sparse virtual disks in private app storage
+• Import installation ISO images
+• Run ARM64 guest systems with QEMU TCG software emulation
+• Use UEFI firmware, virtio storage, and SLIRP user-mode networking
+• View guest serial output in the app
+• Keep a running VM active with an Android foreground service
+• Request graceful VM shutdown from the app or its notification
+• Detect interrupted sessions and check virtual-disk container properties before restarting
+
+LIMITATIONS
+• ARM64 guests only
+• Serial console only; graphical display and touch input are not yet available
+• Software emulation can be slow on lower-powered devices
+• Disk checks do not verify or repair the guest operating system's filesystem
+• Guest operating-system compatibility depends on the ISO and QEMU's ARM64 virt machine
+
+QORVEX does not include guest operating systems. You must provide installation media for systems you are licensed to use.
+
+QEMU is a separate upstream project. See the source repository for third-party license and source notices.
