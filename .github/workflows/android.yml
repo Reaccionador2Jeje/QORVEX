@@ -23,7 +23,12 @@ jobs:
       - name: Checkout QORVEX
         uses: actions/checkout@v4
 
-      - name: Build QEMU and fetch ARM64 UEFI firmware
+      - name: Install EDK II firmware build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends acpica-tools nasm uuid-dev
+
+      - name: Build QEMU and source-build ARM64 UEFI firmware
         run: bash tools/build-qemu-android.sh
 
       - name: Upload Android QEMU runtime
