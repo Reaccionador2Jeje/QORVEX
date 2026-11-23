@@ -6,44 +6,49 @@
 - [x] Establish Android Gradle project and CI build workflow.
 - [ ] Add contribution and third-party notice policies.
 
-## Phase 1 — Android application shell
-- [x] Main dashboard.
-- [x] VM profile data model.
-- [x] Create VM configuration screen.
+## Phase 1 — Android application and storage
+- [x] Main dashboard and VM profile editor.
 - [x] Local persistence for VM profiles.
 - [x] Delete saved VM profiles.
-- [x] Select installation media through Android Storage Access Framework with persisted URI access.
-- [ ] Basic UI tests.
+- [x] Create sparse RAW disk files in app-private storage.
+- [x] Inspect logical disk capacity and physical block allocation.
+- [x] Import installation media from the Android document picker.
+- [x] Copy imported media into app-private storage.
+- [x] Record SHA-256 digest and imported media metadata.
+- [ ] Add import cancellation and progress reporting.
+- [ ] Add automated storage-manager tests.
 
 ## Phase 2 — Runtime abstraction
 - [x] Define runtime and capability interfaces.
-- [x] Add explicit not-installed runtime implementation.
-- [ ] Implement a mock runtime for UI lifecycle testing.
-- [ ] Add observable VM lifecycle state machine.
+- [x] Report the engine as unavailable when QEMU is absent.
+- [ ] Implement an observable VM lifecycle state machine.
 - [ ] Add serial console event model.
+- [ ] Add process supervision and foreground-service lifecycle.
 
-## Phase 3 — QEMU integration\n- [x] Configure NDK/CMake for Android arm64-v8a.\n- [x] Add JNI load/status probe and CI native build setup.\n- [ ] Pin, audit, build and link upstream QEMU; this is still the major blocker.
+## Phase 3 — QEMU integration
+- [x] Configure NDK/CMake for Android arm64-v8a.
+- [x] Add JNI load/status probe.
 - [ ] Select and pin an upstream QEMU version.
 - [ ] Audit Android-compatible build dependencies and licenses.
-- [ ] Build QEMU for supported Android ABIs.
+- [ ] Build QEMU system emulators for supported Android ABIs.
 - [ ] Package required native libraries and firmware.
-- [x] Add a loadable JNI boundary scaffold (QEMU itself is not linked).
+- [ ] Connect QEMU's block layer to imported ISO and RAW disk files.
+- [ ] Implement guest display and input transport.
 - [ ] Verify launch and shutdown on a physical ARM64 Android device.
 
 ## Phase 4 — First guest boot
-- [ ] Add ARM64 machine configuration.
-- [ ] Add firmware management.
-- [x] Create app-private sparse RAW disk containers.\n- [ ] Attach disks to QEMU block layer.
-- [x] Select and persist installation media URI.\n- [ ] Connect installation media to QEMU block layer.
+- [ ] Add validated ARM64 machine and firmware configuration.
 - [ ] Boot a minimal ARM64 Linux guest on a physical device.
+- [ ] Verify disk persistence across app restarts.
+- [ ] Verify graceful stop and recovery after runtime failure.
 
 ## Phase 5 — Usable virtual PC
 - [ ] Touch keyboard and pointer controls.
 - [ ] Display scaling and rotation.
 - [ ] VM pause/resume where supported.
-- [ ] Persistent VM profiles.
 - [ ] Import/export and backup flows.
+- [ ] Multiple VM lifecycle management.
 
 ## Release gate
 
-A release must not be described as a working PC emulator until a guest has been booted and tested on a real supported Android device. CI compilation and emulator-host smoke tests are necessary but not sufficient.
+A release must not be described as a working PC emulator until a guest has been booted and tested on a real supported Android device. CI compilation and host-side smoke tests are necessary but not sufficient.
