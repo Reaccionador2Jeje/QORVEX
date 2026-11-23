@@ -1,0 +1,1 @@
+Initial development build: ARM64 QEMU runtime, VM profiles, virtual disks, ISO import, serial console, foreground service, and interrupted-session checks.
