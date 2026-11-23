@@ -16,10 +16,12 @@ QEMU's user-mode networking dependency is built as `libslirp.so` by the pinned Q
 
 ## EDK II / AAVMF firmware
 
-- Package: Debian Bookworm `qemu-efi-aarch64`.
-- Files: `AAVMF_CODE.fd` and `AAVMF_VARS.fd`.
-- Project: https://www.tianocore.org/
-- License: see the package copyright file copied by CI to `app/src/main/assets/firmware/EDK2-COPYRIGHT`.
+- Project: https://www.tianocore.org/ (EDK II).
+- Source: https://github.com/tianocore/edk2 at commit `fff6d81270b57ee786ea18ad74f43149b9f03494` (`edk2-stable202211`).
+- Platform: `ArmVirtPkg/ArmVirtQemu.dsc`, AARCH64, RELEASE_GCC5.
+- Files: `QEMU_EFI.fd` and `QEMU_VARS.fd`, packaged as `AAVMF_CODE.fd` and `AAVMF_VARS.fd` and padded to 64 MiB.
+- License: BSD-2-Clause-Patent; the EDK II `License.txt` is copied into the runtime artifact as `EDK2-LICENSE.txt`.
+- Build record: `EDK2-BUILD-INFO.txt` is generated alongside the firmware.
 
 The firmware is redistributed separately from QORVEX's original Kotlin application code. Preserve its copyright and license notice.
 
