@@ -178,7 +178,7 @@ private fun QorvexDashboard() {
             } else {
                 machines.forEach { machine ->
                     val mediaName = mediaManager.inspect(machine)?.let { imported ->
-                        "${imported.displayName} • ${formatBytes(imported.sizeBytes)} • SHA-256 verified"
+                        "${imported.displayName} • ${formatBytes(imported.sizeBytes)} • SHA-256 recorded"
                     } ?: machine.installationMediaUri?.let { raw ->
                         runCatching { InstallationMediaReader.describe(context, Uri.parse(raw)).displayName }
                             .getOrDefault("Legacy ISO reference (re-import required)")
