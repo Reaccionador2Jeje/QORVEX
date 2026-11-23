@@ -14,7 +14,8 @@ object QemuCommandBuilder {
         disk: File,
         installationMedia: File?,
         firmwareCode: File,
-        firmwareVars: File
+        firmwareVars: File,
+        qmpSocket: File? = null
     ): List<String> {
         require(machine.architecture.qemuTarget == "aarch64") {
             "This QEMU build currently supports ARM64 guests only."
@@ -46,6 +47,9 @@ object QemuCommandBuilder {
             addAll(listOf("-display", "none"))
             addAll(listOf("-serial", "stdio"))
             addAll(listOf("-monitor", "none"))
+            if (qmpSocket != null) {
+                addAll(listOf("-qmp", "unix:${qmpSocket.absolutePath},server=on,wait=off"))
+            }
             add("-no-reboot")
         }
     }
