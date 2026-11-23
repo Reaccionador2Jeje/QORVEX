@@ -4,7 +4,7 @@
 
 Run virtual computers from Android with a purpose-built interface for machine configuration, virtual storage, installation media, input controls, and VM lifecycle management.
 
-> **Project status:** Early development. The Android dashboard, VM profile configuration, local profile storage, and runtime boundary are in place. QEMU runtime integration and on-device validation are not yet complete.
+> **Project status:** Early development. The Android dashboard, VM profiles, persisted ISO selection, app-private sparse RAW disk containers, and an NDK/JNI boundary scaffold are in place. QEMU itself is not bundled, and guest boot is not available yet.
 
 ## Project goals
 
@@ -19,9 +19,9 @@ Run virtual computers from Android with a purpose-built interface for machine co
 
 - **Android app:** Kotlin, Jetpack Compose, Android lifecycle and storage APIs.
 - **Runtime boundary:** Kotlin interface isolating UI from QEMU implementation.
-- **QEMU integration:** Native QEMU build and JNI bridge, introduced in a later milestone.
+- **QEMU integration:** NDK/CMake and a JNI bridge scaffold are present; upstream QEMU still needs to be pinned, built, audited and linked.
 - **Guest firmware:** Firmware assets selected per supported machine architecture.
-- **VM storage:** App-managed virtual disk files with explicit import/export flows.
+- **VM storage:** App-private sparse RAW disk containers and persisted SAF installation-media references; import/export is still pending.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
 
