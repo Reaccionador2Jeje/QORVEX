@@ -57,7 +57,7 @@ import sys
 
 for path in sys.argv[1:]:
     data = open(path, "rb").read()
-    if data[:4] != b"\\x7fELF" or data[4] != 2 or data[5] != 1:
+    if data[:4] != b"\x7fELF" or data[4] != 2 or data[5] != 1:
         raise SystemExit(f"{path}: not a little-endian ELF64 binary")
     elf_type = struct.unpack_from("<H", data, 16)[0]
     machine = struct.unpack_from("<H", data, 18)[0]
@@ -79,7 +79,7 @@ for path in sys.argv[1:]:
         elif p_type == 3:
             p_offset = struct.unpack_from("<Q", data, offset + 8)[0]
             p_filesz = struct.unpack_from("<Q", data, offset + 32)[0]
-            interpreter = data[p_offset:p_offset + p_filesz].rstrip(b"\\0").decode()
+            interpreter = data[p_offset:p_offset + p_filesz].rstrip(b"\0").decode()
     if not alignments or any(value < 16384 for value in alignments):
         raise SystemExit(f"{path}: LOAD segments are not 16 KiB aligned: {alignments}")
     if is_qemu and interpreter != "/system/bin/linker64":
