@@ -19,6 +19,7 @@
              +---- app-private RAW disk
              +---- imported installation ISO
              +---- serial stdio -> Compose console
+             +---- QMP Unix socket -> graceful shutdown
 
 The file named `libqemu-system-aarch64.so` is a native executable packaged in `jniLibs/arm64-v8a` so Android extracts it into `nativeLibraryDir`. It is executed as a child process; it is not passed to `System.loadLibrary()`.
 
@@ -47,6 +48,7 @@ The first runtime launches only ARM64 guests using QEMU's generic `virt` machine
 - optional ISO attached as a read-only virtio CD-ROM with CD-ROM boot priority
 - SLIRP user networking through virtio-net
 - serial console on stdio; graphical display disabled in this first backend
+- optional QMP Unix-domain socket for monitor commands and graceful shutdown
 
 All command arguments are passed as an argument vector to ProcessBuilder. No shell command string is assembled from profile data.
 
@@ -59,7 +61,7 @@ All command arguments are passed as an argument vector to ProcessBuilder. No she
 
 ## 5. Runtime limits
 
-The current implementation can launch and supervise one QEMU child process while the activity/runtime object remains alive. It does not yet own the VM through a foreground service. It exposes serial output only; there is no framebuffer surface, touch input, audio, pause/resume, or QMP management UI yet.
+The current implementation can launch and supervise one QEMU child process while the activity/runtime object remains alive. It does not yet own the VM through a foreground service. It exposes serial output only; there is no framebuffer surface, touch input, audio, pause/resume, or interactive QMP management UI yet. The stop action attempts a QMP `quit` request and falls back to process termination if the monitor is unavailable.
 
 Only ARM64 guests are supported. x86_64 profiles are rejected at runtime until an x86_64-softmmu build is included.
 
@@ -71,7 +73,7 @@ Only ARM64 guests are supported. x86_64 profiles are rejected at runtime until a
 - The ISO is attached read-only.
 - The UEFI variable store is unique per VM.
 - The runtime reports missing binaries, firmware, unsupported ABI, and unsupported guest architecture rather than claiming a boot succeeded.
-- A foreground service and graceful QMP shutdown are required before background VM operation is considered reliable.
+- A foreground service is required before background VM operation is considered reliable. QMP graceful shutdown is available, with forced process termination retained as a fallback.
 
 ## 7. Licensing
 
