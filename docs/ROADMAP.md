@@ -17,9 +17,9 @@
 
 ## Phase 2 — QEMU ARM64 runtime
 - [x] Pin upstream QEMU 11.1.2 through the Android build recipe.
-- [x] Build QEMU for Android/Bionic ARM64 with TCG.
-- [x] Package QEMU executable and SLIRP dependency in the APK.
-- [x] Package AAVMF UEFI code and per-VM variable-store template.
+- [ ] Build QEMU for Android/Bionic ARM64 with TCG (CI build not yet verified).
+- [ ] Package QEMU executable and SLIRP dependency in the APK (awaiting successful CI artifact).
+- [ ] Package AAVMF UEFI code and per-VM variable-store template (awaiting successful CI artifact).
 - [x] Generate launch arguments for the ARM64 `virt` machine.
 - [x] Attach app-private RAW disk and optional installation ISO.
 - [x] Add SLIRP user-mode networking.
