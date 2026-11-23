@@ -62,8 +62,8 @@ sealed interface RuntimeResult {
  * The executable is built for Android/Bionic and packaged in jniLibs; it is
  * deliberately not loaded with System.loadLibrary().
  *
- * This first runtime exposes the serial console. A graphical display frontend,
- * pause/resume and foreground-service supervision are separate follow-up work.
+ * This runtime exposes the serial console and is supervised by the Android
+ * foreground service. A graphical display frontend and pause/resume remain future work.
  */
 class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
     private val appContext = context.applicationContext
@@ -266,7 +266,9 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
         appendConsoleLine("Automatic restart was skipped to avoid writing to a potentially inconsistent disk.")
         val machine = VirtualMachineRepository(appContext).getAll()
             .firstOrNull { it.id == previous.machineId }
-        if (machine == null) {
+        if (previous.machineId.isBlank() || previous.diskCapacityBytes <= 0L || previous.startedAtEpochMs <= 0L) {
+            appendConsoleLine("Recovery journal is incomplete or invalid; the VM was not restarted.")
+        } else if (machine == null) {
             appendConsoleLine("Recovery check: the VM profile for the interrupted session was not found.")
         } else {
             val report = diskManager.verifyIntegrity(machine)
