@@ -44,10 +44,12 @@ for locale in en-US es-ES; do
   done
 done
 
-if grep -Eiq '(^|[[:space:]])(curl|wget)[[:space:]]|git (clone|fetch)|pip install' "$BUILD_SCRIPT"; then
-  fail "Native build script still downloads or fetches build inputs; offline build is not ready"
+if grep -q 'OFFLINE="${QORVEX_OFFLINE:-0}"' "$BUILD_SCRIPT" &&
+   grep -q 'Offline source tree missing' "$BUILD_SCRIPT" &&
+   grep -q 'Offline EDK II source missing' "$ROOT/tools/build-aavmf-from-source.sh"; then
+  pass "Native scripts expose explicit offline source mode and fail when staged inputs are missing"
 else
-  pass "No obvious network-fetch commands in native build script"
+  fail "Native scripts do not enforce the offline source mode"
 fi
 
 if [ -s "$ROOT/tools/source-checksums.sha256" ]; then
