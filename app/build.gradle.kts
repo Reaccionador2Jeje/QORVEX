@@ -16,16 +16,15 @@ android {
         versionName = "0.3.0-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a") }
-        externalNativeBuild { cmake { cppFlags += "-std=c++17" } }
     }
 
     buildFeatures { compose = true }
 
-    ndkVersion = "27.2.12479018"
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
+    packaging {
+        jniLibs {
+            // QEMU is an Android-native executable packaged under the .so name
+            // so PackageManager extracts it into nativeLibraryDir for execve.
+            useLegacyPackaging = true
         }
     }
 
