@@ -19,10 +19,9 @@ internal class RuntimeSessionJournal(context: Context) {
 
     fun read(): Session? {
         if (!preferences.getBoolean(KEY_ACTIVE, false)) return null
-        val machineId = preferences.getString(KEY_MACHINE_ID, null) ?: return null
+        val machineId = preferences.getString(KEY_MACHINE_ID, null).orEmpty()
         val capacity = preferences.getLong(KEY_DISK_CAPACITY, -1L)
         val startedAt = preferences.getLong(KEY_STARTED_AT, 0L)
-        if (capacity <= 0L || startedAt <= 0L) return Session(machineId, capacity, startedAt)
         return Session(machineId, capacity, startedAt)
     }
 
