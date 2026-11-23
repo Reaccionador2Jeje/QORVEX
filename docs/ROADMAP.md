@@ -3,8 +3,8 @@
 ## Phase 0 — Repository foundation
 - [x] Establish project identity and repository.
 - [x] Document architecture and licensing boundary.
-- [x] Establish Android Gradle project and CI build workflow.
-- [ ] Add contribution and third-party notice policies.
+- [x] Establish Android Gradle project and CI workflow.
+- [x] Record third-party QEMU and firmware provenance.
 
 ## Phase 1 — Android application and storage
 - [x] Main dashboard and VM profile editor.
@@ -12,43 +12,43 @@
 - [x] Delete saved VM profiles.
 - [x] Create sparse RAW disk files in app-private storage.
 - [x] Inspect logical disk capacity and physical block allocation.
-- [x] Import installation media from the Android document picker.
-- [x] Copy imported media into app-private storage.
-- [x] Record SHA-256 digest and imported media metadata.
-- [ ] Add import cancellation and progress reporting.
-- [ ] Add automated storage-manager tests.
+- [x] Import installation media into app-private storage.
+- [x] Record SHA-256 metadata for imported media.
 
-## Phase 2 — Runtime abstraction
-- [x] Define runtime and capability interfaces.
-- [x] Report the engine as unavailable when QEMU is absent.
-- [ ] Implement an observable VM lifecycle state machine.
-- [ ] Add serial console event model.
-- [ ] Add process supervision and foreground-service lifecycle.
+## Phase 2 — QEMU ARM64 runtime
+- [x] Pin upstream QEMU 11.1.2 through the Android build recipe.
+- [x] Build QEMU for Android/Bionic ARM64 with TCG.
+- [x] Package QEMU executable and SLIRP dependency in the APK.
+- [x] Package AAVMF UEFI code and per-VM variable-store template.
+- [x] Generate launch arguments for the ARM64 `virt` machine.
+- [x] Attach app-private RAW disk and optional installation ISO.
+- [x] Add SLIRP user-mode networking.
+- [x] Start and stop a QEMU child process.
+- [x] Capture QEMU serial output in the app.
+- [ ] Verify the complete QEMU build and APK pipeline in CI.
+- [ ] Boot and install an ARM64 guest on a physical Android device.
 
-## Phase 3 — QEMU integration
-- [x] Configure NDK/CMake for Android arm64-v8a.
-- [x] Add JNI load/status probe.
-- [ ] Select and pin an upstream QEMU version.
-- [ ] Audit Android-compatible build dependencies and licenses.
-- [ ] Build QEMU system emulators for supported Android ABIs.
-- [ ] Package required native libraries and firmware.
-- [ ] Connect QEMU's block layer to imported ISO and RAW disk files.
-- [ ] Implement guest display and input transport.
-- [ ] Verify launch and shutdown on a physical ARM64 Android device.
+## Phase 3 — Runtime reliability
+- [ ] Move VM ownership into an Android foreground service.
+- [ ] Preserve VM state across activity recreation.
+- [ ] Add graceful QMP shutdown and monitor support.
+- [ ] Add crash recovery and disk consistency checks.
+- [ ] Add observable boot/readiness states and actionable diagnostics.
+- [ ] Add automated process lifecycle tests.
 
-## Phase 4 — First guest boot
-- [ ] Add validated ARM64 machine and firmware configuration.
-- [ ] Boot a minimal ARM64 Linux guest on a physical device.
-- [ ] Verify disk persistence across app restarts.
-- [ ] Verify graceful stop and recovery after runtime failure.
+## Phase 4 — Graphical virtual PC
+- [ ] Add a QEMU display backend that renders into an Android surface.
+- [ ] Add touch keyboard, pointer, and gesture input.
+- [ ] Add display scaling, rotation, and resolution controls.
+- [ ] Add clipboard integration.
+- [ ] Add audio output.
 
-## Phase 5 — Usable virtual PC
-- [ ] Touch keyboard and pointer controls.
-- [ ] Display scaling and rotation.
-- [ ] VM pause/resume where supported.
-- [ ] Import/export and backup flows.
-- [ ] Multiple VM lifecycle management.
+## Phase 5 — More guest architectures and formats
+- [ ] Build and package x86_64 system emulation.
+- [ ] Add QCOW2 support and disk conversion tools.
+- [ ] Add import/export and backup flows.
+- [ ] Add multiple concurrent VM support where device resources permit.
 
 ## Release gate
 
-A release must not be described as a working PC emulator until a guest has been booted and tested on a real supported Android device. CI compilation and host-side smoke tests are necessary but not sufficient.
+A release must not be described as a complete PC emulator until a guest has booted and been tested on a physical supported Android device. A graphical release additionally requires working display and input.
