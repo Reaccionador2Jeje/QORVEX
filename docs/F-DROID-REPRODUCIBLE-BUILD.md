@@ -36,7 +36,7 @@ The F-Droid build recipe must stage all inputs before the isolated build phase:
 | EDK II | `fff6d81270b57ee786ea18ad74f43149b9f03494` |
 | PCRE2 | `10.44` |
 | libffi | `3.4.6` |
-| GLib | `2.82.5` |
+| GLib | `2.84.4` |
 | Pixman | `0.44.2` |
 | attr | `2.5.2` |
 | libusb | `1.0.27` |
