@@ -76,8 +76,10 @@ Only ARM64 guests are supported. x86_64 profiles are rejected at runtime until a
 - The ISO is attached read-only.
 - The UEFI variable store is unique per VM.
 - The runtime reports missing binaries, firmware, unsupported ABI, and unsupported guest architecture rather than claiming a boot succeeded.
-- QEMU runs under an Android foreground service with a persistent notification and user-accessible stop action. QMP graceful shutdown is available, with forced process termination retained as a fallback.
-- The foreground service reduces background process eviction risk; process-death recovery and automatic guest restoration are not implemented.
+- QEMU runs under an Android foreground service with a persistent notification and user-accessible stop action. The service removes its notification after the guest process exits.
+- A durable session journal detects a previous unclean app-process exit. QORVEX does not automatically restart the guest; it validates the disk container structure and reports the result before the user decides what to do.
+- Disk validation checks regular-file status, private-directory containment, expected logical capacity, and read/write access. It does not inspect or repair the guest filesystem and does not prove guest data consistency.
+- QMP graceful shutdown is available, with forced process termination retained as a fallback.
 
 ## 7. Licensing
 
