@@ -38,17 +38,8 @@ docker cp "$container_id:/opt/qemu-out/libslirp.so" \
     "$OUT/jniLibs/arm64-v8a/libslirp.so"
 chmod 755 "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so"
 
-echo "Extracting Debian ARM64 UEFI firmware and its copyright notice..."
-docker run --rm \
-    -v "$OUT/assets/firmware:/out" \
-    debian:bookworm-slim \
-    bash -euxc '
-      apt-get update
-      apt-get install -y --no-install-recommends qemu-efi-aarch64 ca-certificates
-      cp -L /usr/share/AAVMF/AAVMF_CODE.fd /out/AAVMF_CODE.fd
-      cp -L /usr/share/AAVMF/AAVMF_VARS.fd /out/AAVMF_VARS.fd
-      cp /usr/share/doc/qemu-efi-aarch64/copyright /out/EDK2-COPYRIGHT
-    '
+echo "Building ARM64 UEFI firmware from pinned EDK II source..."
+bash "$ROOT/tools/build-aavmf-from-source.sh"
 
 echo "Checking QEMU and SLIRP ELF architecture and Android 16 KiB page alignment..."
 python3 - "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so" "$OUT/jniLibs/arm64-v8a/libslirp.so" <<'PY'
