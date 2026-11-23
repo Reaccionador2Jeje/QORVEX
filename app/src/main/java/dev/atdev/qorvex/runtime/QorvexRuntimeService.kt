@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.IBinder
 import dev.atdev.qorvex.MainActivity
@@ -107,7 +108,7 @@ class QorvexRuntimeService : Service() {
             .setContentIntent(openApp)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .addAction(Notification.Action.Builder(null, "Stop VM", stopService).build())
+            .addAction(Notification.Action.Builder(Icon.createWithResource(this, android.R.drawable.ic_media_pause), "Stop VM", stopService).build())
             .build()
     }
 
