@@ -20,7 +20,7 @@ grep -Fq 'submodule status --recursive' "$EDK2"
 grep -Fq 'Offline EDK II Python environment missing' "$EDK2"
 echo "PASS: offline mode checks staged source trees, immutable Git revisions, submodules, and Python environment"
 
-if grep -Fq 'OFFLINE=1' "$QEMU" && grep -Fq 'OFFLINE=1' "$EDK2"; then
+if grep -Fq '[ "$OFFLINE" = "1" ]' "$QEMU" && grep -Fq '[ "$OFFLINE" = "1" ]' "$EDK2"; then
   echo "PASS: both native builders have offline-mode branches"
 else
   echo "FAIL: offline mode branch missing" >&2
