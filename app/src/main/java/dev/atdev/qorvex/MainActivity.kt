@@ -1,8 +1,12 @@
 package dev.atdev.qorvex
 
 import android.os.Bundle
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,6 +44,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import dev.atdev.qorvex.runtime.NativeQemuBridge
+import dev.atdev.qorvex.storage.InstallationMediaReader
+import dev.atdev.qorvex.storage.VirtualDiskManager
 import dev.atdev.qorvex.vm.GuestArchitecture
 import dev.atdev.qorvex.vm.VirtualMachine
 import dev.atdev.qorvex.vm.VirtualMachineRepository
@@ -71,6 +78,24 @@ private fun QorvexDashboard() {
     val machines = remember { mutableStateListOf<VirtualMachine>().apply { addAll(repository.getAll()) } }
     var showCreateDialog by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
+    var mediaTargetId by remember { mutableStateOf<String?>(null) }
+    val diskManager = remember { VirtualDiskManager(context) }
+    val mediaPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        val targetId = mediaTargetId
+        if (uri != null && targetId != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                val media = InstallationMediaReader.describe(context, uri)
+                val index = machines.indexOfFirst { it.id == targetId }
+                check(index >= 0) { "VM profile no longer exists." }
+                val updated = machines[index].copy(installationMediaUri = uri.toString())
+                repository.save(updated)
+                machines[index] = updated
+                notice = "Installation media linked: ${media.displayName}"
+            }.onFailure { notice = "Could not link file: ${it.message}" }
+        }
+        mediaTargetId = null
+    }
 
     Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF080D18)) {
         Column(
@@ -86,7 +111,7 @@ private fun QorvexDashboard() {
                     Text("QORVEX", color = Color(0xFF67E8F9), fontSize = 28.sp, fontWeight = FontWeight.Black)
                     Text("ATDEV • VIRTUAL PC", color = Color(0xFF94A3B8), fontSize = 11.sp, letterSpacing = 2.sp)
                 }
-                Text("0.2.0-dev", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                Text("0.3.0-dev", color = Color(0xFF94A3B8), fontSize = 12.sp)
             }
 
             Card(
@@ -129,14 +154,29 @@ private fun QorvexDashboard() {
                 }
             } else {
                 machines.forEach { machine ->
+                    val mediaName = machine.installationMediaUri?.let { raw ->
+                        runCatching { InstallationMediaReader.describe(context, Uri.parse(raw)).displayName }
+                            .getOrDefault("ISO linked (access unavailable)")
+                    } ?: "No installation media"
                     MachineCard(
                         machine = machine,
+                        mediaName = mediaName,
+                        diskExists = diskManager.inspect(machine) != null,
+                        onSelectMedia = {
+                            mediaTargetId = machine.id
+                            mediaPicker.launch(arrayOf("application/x-iso9660-image", "application/octet-stream", "*/*"))
+                        },
+                        onCreateDisk = {
+                            runCatching { diskManager.createSparseDisk(machine) }
+                                .onSuccess { notice = "Sparse RAW disk created: ${it.file.name} (${machine.diskSizeGiB} GiB virtual capacity)." }
+                                .onFailure { notice = "Disk creation failed: ${it.message}" }
+                        },
                         onDelete = {
                             repository.delete(machine.id)
                             machines.remove(machine)
                             notice = "${machine.name} profile deleted."
                         },
-                        onStart = { notice = "Profile saved. QEMU runtime is not integrated yet, so this machine cannot boot in this build." }
+                        onStart = { notice = "Cannot boot yet: JNI bridge is present, but the QEMU engine is not linked." }
                     )
                 }
             }
@@ -155,7 +195,14 @@ private fun QorvexDashboard() {
             }
 
             Spacer(Modifier.height(12.dp))
-            Text("QEMU runtime: not connected", color = Color(0xFFFBBF24), fontSize = 12.sp)
+            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF111827))) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("NATIVE BRIDGE", color = Color(0xFF67E8F9), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Text(if (NativeQemuBridge.isLoaded) "JNI library loaded" else "JNI library unavailable", color = Color.White, fontSize = 13.sp)
+                    Text(NativeQemuBridge.status, color = Color(0xFF94A3B8), fontSize = 11.sp)
+                    Text("QEMU engine: not bundled • Guest boot: disabled", color = Color(0xFFFBBF24), fontSize = 11.sp)
+                }
+            }
             Text("Built by AtDev", color = Color(0xFF64748B), fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
         }
     }
@@ -174,7 +221,15 @@ private fun QorvexDashboard() {
 }
 
 @Composable
-private fun MachineCard(machine: VirtualMachine, onDelete: () -> Unit, onStart: () -> Unit) {
+private fun MachineCard(
+    machine: VirtualMachine,
+    mediaName: String,
+    diskExists: Boolean,
+    onDelete: () -> Unit,
+    onStart: () -> Unit,
+    onSelectMedia: () -> Unit,
+    onCreateDisk: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -187,8 +242,14 @@ private fun MachineCard(machine: VirtualMachine, onDelete: () -> Unit, onStart: 
             }
             Text(machine.architecture.label, color = Color(0xFF94A3B8), fontSize = 13.sp)
             Text("${machine.memoryMiB} MiB RAM  •  ${machine.cpuCores} CPU cores  •  ${machine.diskSizeGiB} GiB disk", color = Color(0xFFCBD5E1), fontSize = 12.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Media: $mediaName", color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 2)
+            Text(if (diskExists) "Virtual disk: created" else "Virtual disk: not created", color = if (diskExists) Color(0xFF86EFAC) else Color(0xFF94A3B8), fontSize = 11.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onStart) { Text("Start") }
+                OutlinedButton(onClick = onSelectMedia) { Text("Select ISO") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onCreateDisk) { Text(if (diskExists) "Verify disk" else "Create disk") }
                 OutlinedButton(onClick = onDelete) { Text("Delete profile") }
             }
         }
@@ -230,7 +291,7 @@ private fun CreateMachineDialog(onDismiss: () -> Unit, onCreate: (VirtualMachine
                 NumberField("CPU cores", cores, { cores = it; error = null })
                 NumberField("Virtual disk (GiB)", disk, { disk = it; error = null })
                 error?.let { Text(it, color = Color(0xFFFCA5A5), fontSize = 12.sp) }
-                Text("This creates a configuration profile only. It does not allocate a disk image or boot a guest OS yet.", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                Text("This creates a profile. Create its disk and select installation media separately; boot requires the QEMU engine.", color = Color(0xFF94A3B8), fontSize = 11.sp)
             }
         },
         confirmButton = {
