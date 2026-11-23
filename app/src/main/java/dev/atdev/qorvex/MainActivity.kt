@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,7 +45,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
-import dev.atdev.qorvex.runtime.NativeQemuBridge
+import dev.atdev.qorvex.runtime.QemuProcessRuntime
+import dev.atdev.qorvex.runtime.RuntimeAvailability
+import dev.atdev.qorvex.runtime.RuntimeState
 import dev.atdev.qorvex.storage.InstallationMediaReader
 import dev.atdev.qorvex.storage.InstallationMediaManager
 import dev.atdev.qorvex.storage.VirtualDiskManager
@@ -86,6 +89,11 @@ private fun QorvexDashboard() {
     val diskManager = remember { VirtualDiskManager(context) }
     val mediaManager = remember { InstallationMediaManager(context) }
     val scope = rememberCoroutineScope()
+    val runtime = remember { QemuProcessRuntime(context) }
+    val runtimeState by runtime.state.collectAsState()
+    val activeMachineId by runtime.activeMachineId.collectAsState()
+    val consoleText by runtime.consoleText.collectAsState()
+    val runtimeCapabilities = remember { runtime.getCapabilities() }
     val mediaPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         val targetId = mediaTargetId
         if (uri != null && targetId != null) {
@@ -146,7 +154,7 @@ private fun QorvexDashboard() {
                     Text("Your pocket-sized PC platform", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Create and organize virtual computer profiles. QEMU boot support is being developed separately.",
+                        "Create ARM64 virtual computers powered by QEMU TCG software emulation.",
                         color = Color(0xFFB6C7D9), fontSize = 14.sp,
                         style = androidx.compose.ui.text.TextStyle(lineHeight = 21.sp)
                     )
@@ -201,7 +209,26 @@ private fun QorvexDashboard() {
                             machines.remove(machine)
                             notice = "${machine.name} profile deleted."
                         },
-                        onStart = { notice = "Cannot boot yet: JNI bridge is present, but the QEMU engine is not linked." }
+                        isRunning = activeMachineId == machine.id,
+                        onStart = {
+                            scope.launch {
+                                val result = runtime.start(machine)
+                                notice = when (result) {
+                                    is dev.atdev.qorvex.runtime.RuntimeResult.Success ->
+                                        "QEMU started for ${machine.name}. Serial output is shown below."
+                                    is dev.atdev.qorvex.runtime.RuntimeResult.Failure -> result.reason
+                                }
+                            }
+                        },
+                        onStop = {
+                            scope.launch {
+                                val result = runtime.stop(machine.id)
+                                notice = when (result) {
+                                    is dev.atdev.qorvex.runtime.RuntimeResult.Success -> "QEMU stopped."
+                                    is dev.atdev.qorvex.runtime.RuntimeResult.Failure -> result.reason
+                                }
+                            }
+                        }
                     )
                 }
             }
@@ -222,10 +249,29 @@ private fun QorvexDashboard() {
             Spacer(Modifier.height(12.dp))
             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF111827))) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("NATIVE BRIDGE", color = Color(0xFF67E8F9), fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                    Text(if (NativeQemuBridge.isLoaded) "JNI library loaded" else "JNI library unavailable", color = Color.White, fontSize = 13.sp)
-                    Text(NativeQemuBridge.status, color = Color(0xFF94A3B8), fontSize = 11.sp)
-                    Text("QEMU engine: not bundled • Guest boot: disabled", color = Color(0xFFFBBF24), fontSize = 11.sp)
+                    Text("QEMU ENGINE", color = Color(0xFF67E8F9), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Text(
+                        if (runtimeCapabilities.availability == RuntimeAvailability.READY) "QEMU ARM64 packaged"
+                        else "QEMU runtime unavailable",
+                        color = Color.White,
+                        fontSize = 13.sp
+                    )
+                    Text(runtimeCapabilities.detail, color = Color(0xFF94A3B8), fontSize = 11.sp)
+                    Text("Runtime state: ${runtimeState.name}", color = if (runtimeState == RuntimeState.RUNNING) Color(0xFF86EFAC) else Color(0xFFCBD5E1), fontSize = 11.sp)
+                }
+            }
+            if (activeMachineId != null || consoleText.isNotBlank()) {
+                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF050A12))) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("SERIAL CONSOLE", color = Color(0xFF67E8F9), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Text(
+                            consoleText.ifBlank { "Waiting for guest serial output..." },
+                            color = Color(0xFFB7F7D8),
+                            fontSize = 10.sp,
+                            lineHeight = 14.sp,
+                            maxLines = 18
+                        )
+                    }
                 }
             }
             Text("Built by AtDev", color = Color(0xFF64748B), fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -251,7 +297,9 @@ private fun MachineCard(
     mediaName: String,
     diskInfo: dev.atdev.qorvex.storage.VirtualDiskInfo?,
     onDelete: () -> Unit,
+    isRunning: Boolean,
     onStart: () -> Unit,
+    onStop: () -> Unit,
     onSelectMedia: () -> Unit,
     onCreateDisk: () -> Unit
 ) {
@@ -278,8 +326,11 @@ private fun MachineCard(
                 Text("Virtual disk: not created", color = Color(0xFF94A3B8), fontSize = 11.sp)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onStart) { Text("Start") }
-                OutlinedButton(onClick = onSelectMedia) { Text("Select ISO") }
+                Button(
+                    onClick = if (isRunning) onStop else onStart,
+                    enabled = true
+                ) { Text(if (isRunning) "Stop" else "Start") }
+                OutlinedButton(onClick = onSelectMedia, enabled = !isRunning) { Text("Select ISO") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onCreateDisk) { Text(if (diskInfo != null) "Verify disk" else "Create disk") }
@@ -324,7 +375,7 @@ private fun CreateMachineDialog(onDismiss: () -> Unit, onCreate: (VirtualMachine
                 NumberField("CPU cores", cores, { cores = it; error = null })
                 NumberField("Virtual disk (GiB)", disk, { disk = it; error = null })
                 error?.let { Text(it, color = Color(0xFFFCA5A5), fontSize = 12.sp) }
-                Text("This creates a profile. Create its disk and select installation media separately; boot requires the QEMU engine.", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                Text("QEMU currently runs ARM64 guests using software emulation. x86_64 profiles are saved but cannot boot in this build.", color = Color(0xFF94A3B8), fontSize = 11.sp)
             }
         },
         confirmButton = {
