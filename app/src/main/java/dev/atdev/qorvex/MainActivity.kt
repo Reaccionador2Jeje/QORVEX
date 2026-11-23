@@ -45,7 +45,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
-import dev.atdev.qorvex.runtime.QemuProcessRuntime
+import dev.atdev.qorvex.runtime.QorvexRuntimeService
 import dev.atdev.qorvex.runtime.RuntimeAvailability
 import dev.atdev.qorvex.runtime.RuntimeState
 import dev.atdev.qorvex.storage.InstallationMediaReader
@@ -89,7 +89,7 @@ private fun QorvexDashboard() {
     val diskManager = remember { VirtualDiskManager(context) }
     val mediaManager = remember { InstallationMediaManager(context) }
     val scope = rememberCoroutineScope()
-    val runtime = remember { QemuProcessRuntime(context) }
+    val runtime = remember { QorvexRuntimeService.getRuntime(context) }
     val runtimeState by runtime.state.collectAsState()
     val activeMachineId by runtime.activeMachineId.collectAsState()
     val consoleText by runtime.consoleText.collectAsState()
@@ -212,22 +212,27 @@ private fun QorvexDashboard() {
                         isRunning = activeMachineId == machine.id,
                         onStart = {
                             scope.launch {
-                                val result = runtime.start(machine)
-                                notice = when (result) {
-                                    is dev.atdev.qorvex.runtime.RuntimeResult.Success ->
-                                        "QEMU started for ${machine.name}. Serial output is shown below."
-                                    is dev.atdev.qorvex.runtime.RuntimeResult.Failure -> result.reason
+                                runCatching {
+                                    QorvexRuntimeService.start(context)
+                                    runtime.start(machine)
+                                }.onSuccess { result ->
+                                    notice = when (result) {
+                                        is dev.atdev.qorvex.runtime.RuntimeResult.Success ->
+                                            "QEMU started for ${machine.name}. It will keep running when the dashboard is in the background."
+                                        is dev.atdev.qorvex.runtime.RuntimeResult.Failure -> {
+                                            QorvexRuntimeService.stop(context)
+                                            result.reason
+                                        }
+                                    }
+                                }.onFailure { error ->
+                                    QorvexRuntimeService.stop(context)
+                                    notice = "Could not start the QORVEX background service: ${error.message}"
                                 }
                             }
                         },
                         onStop = {
-                            scope.launch {
-                                val result = runtime.stop(machine.id)
-                                notice = when (result) {
-                                    is dev.atdev.qorvex.runtime.RuntimeResult.Success -> "QEMU stopped."
-                                    is dev.atdev.qorvex.runtime.RuntimeResult.Failure -> result.reason
-                                }
-                            }
+                            QorvexRuntimeService.requestStop(context, machine.id)
+                            notice = "Sending graceful stop request to QEMU..."
                         }
                     )
                 }
