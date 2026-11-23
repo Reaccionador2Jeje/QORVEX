@@ -1,4 +1,4 @@
-name: Android CI
+name: Android + QEMU ARM64
 
 on:
   push:
@@ -11,29 +11,66 @@ permissions:
   contents: read
 
 jobs:
-  debug-build:
-    name: Build Android debug APK
+  build-qemu-runtime:
+    name: Build QEMU 11.1.2 for Android ARM64
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
-      - name: Checkout
+      - name: Checkout QORVEX
         uses: actions/checkout@v4
+
+      - name: Build QEMU and fetch ARM64 UEFI firmware
+        run: bash tools/build-qemu-android.sh
+
+      - name: Upload Android QEMU runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: qorvex-qemu-arm64
+          path: out/qemu-runtime/
+          if-no-files-found: error
+          retention-days: 14
+
+  android-build:
+    name: Build and test QORVEX APK
+    runs-on: ubuntu-latest
+    needs: build-qemu-runtime
+    steps:
+      - name: Checkout QORVEX
+        uses: actions/checkout@v4
+
+      - name: Download QEMU runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: qorvex-qemu-arm64
+          path: out/qemu-runtime
+
+      - name: Package QEMU and firmware
+        run: |
+          mkdir -p app/src/main/jniLibs/arm64-v8a app/src/main/assets/firmware
+          cp out/qemu-runtime/jniLibs/arm64-v8a/*.so app/src/main/jniLibs/arm64-v8a/
+          cp out/qemu-runtime/assets/firmware/* app/src/main/assets/firmware/
+          test -x app/src/main/jniLibs/arm64-v8a/libqemu-system-aarch64.so
+          test -f app/src/main/jniLibs/arm64-v8a/libslirp.so
+          test -f app/src/main/assets/firmware/AAVMF_CODE.fd
+          test -f app/src/main/assets/firmware/AAVMF_VARS.fd
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-      - name: Install Android SDK components
-        env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
+
+      - name: Run unit tests
+        run: gradle testDebugUnitTest
+
       - name: Build debug APK
         run: gradle assembleDebug
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
