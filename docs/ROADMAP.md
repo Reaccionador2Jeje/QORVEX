@@ -32,7 +32,9 @@
 - [x] Move VM runtime ownership into an Android foreground service with an ongoing notification.
 - [x] Preserve the shared runtime instance and observable state across Activity recreation/backgrounding.
 - [x] Add a QMP Unix-socket control channel and graceful shutdown request (fallback termination retained).
-- [ ] Add crash recovery and disk consistency checks.
+- [x] Detect interrupted VM sessions using a durable recovery journal; never auto-boot an interrupted guest.
+- [x] Validate virtual disk file type, private storage location, logical capacity, and read/write access before boot.
+- [x] Show recovery diagnostics in the serial console and add JVM tests for disk validation rules.
 - [ ] Add observable boot/readiness states and actionable diagnostics.
 - [ ] Add automated process lifecycle tests.
 
