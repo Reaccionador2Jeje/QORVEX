@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Native host build of the QORVEX Android ARM64 QEMU runtime. No Docker.
-ROOT="$(cd "$(dirname "\${BASH_SOURCE[0]}")/.." && pwd)"
-WORK="\${QORVEX_QEMU_WORKDIR:-\${RUNNER_TEMP:-/tmp}/qorvex-qemu-build}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WORK="${QORVEX_QEMU_WORKDIR:-${RUNNER_TEMP:-/tmp}/qorvex-qemu-build}"
 PODROID_REPO="https://github.com/ExTV/Podroid.git"
 PODROID_COMMIT="e3fc1befa3c135d28bf8d40e3c2264d93fea87ef"
 QEMU_VERSION=11.1.2
@@ -13,8 +13,8 @@ OUT="$ROOT/out/qemu-runtime"
 PODROID_DIR="$WORK/Podroid"
 SRC="$WORK/sources"
 PREFIX="$WORK/deps"
-NDK_ROOT="\${ANDROID_NDK_HOME:-\${ANDROID_NDK_ROOT:-$WORK/android-ndk-$NDK_VERSION}}"
-JOBS="\${QORVEX_BUILD_JOBS:-$(getconf _NPROCESSORS_ONLN)}"
+NDK_ROOT="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-$WORK/android-ndk-$NDK_VERSION}}"
+JOBS="${QORVEX_BUILD_JOBS:-$(getconf _NPROCESSORS_ONLN)}"
 
 for tool in git curl unzip sha1sum make ninja meson pkg-config flex bison autoconf automake libtoolize gcc g++ patchelf readelf python3; do
  command -v "$tool" >/dev/null || { echo "Missing build prerequisite: $tool" >&2; exit 1; }
@@ -37,7 +37,7 @@ test -x "$CC" || { echo "Android NDK clang not found: $CC" >&2; exit 1; }
 
 cat > "$WORK/pkg-config-android" <<'PKGCFG'
 #!/bin/sh
-export PKG_CONFIG_LIBDIR="\${PREFIX}/lib/pkgconfig"
+export PKG_CONFIG_LIBDIR="${PREFIX}/lib/pkgconfig"
 export PKG_CONFIG_PATH=
 exec pkg-config "$@"
 PKGCFG
