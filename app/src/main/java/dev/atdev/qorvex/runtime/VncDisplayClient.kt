@@ -2,7 +2,10 @@ package dev.atdev.qorvex.runtime
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class VncDisplayClient : Closeable {
     private val socket = Socket()
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val closed = AtomicBoolean(false)
     private lateinit var input: DataInputStream
     private lateinit var output: DataOutputStream
@@ -47,7 +51,7 @@ class VncDisplayClient : Closeable {
         output = DataOutputStream(BufferedOutputStream(socket.getOutputStream()))
         handshake()
         requestFramebufferUpdate(incremental = false)
-        readLoop()
+        ioScope.launch { runCatching { readLoop() }.onFailure { if (!closed.get()) close() } }
     }
 
     private fun handshake() {
