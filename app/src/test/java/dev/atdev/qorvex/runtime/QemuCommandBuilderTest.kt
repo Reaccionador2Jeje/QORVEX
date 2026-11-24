@@ -40,6 +40,9 @@ class QemuCommandBuilderTest {
         assertTrue(args.any { it.contains(vars.absolutePath) })
         assertTrue(args.containsAll(listOf("-serial", "stdio", "-monitor", "none")))
         assertTrue(args.containsAll(listOf("-display", "none", "-vnc", "127.0.0.1:0")))
+        assertTrue(args.containsAll(listOf("-device", "virtio-gpu-device")))
+        assertTrue(args.containsAll(listOf("-device", "virtio-keyboard-device")))
+        assertTrue(args.containsAll(listOf("-device", "virtio-tablet-device")))
         assertTrue(args.containsAll(listOf("-qmp", "unix:${qmp.absolutePath},server=on,wait=off")))
         assertFalse(args.any { it == "mon:stdio" })
     }
