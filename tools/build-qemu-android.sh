@@ -254,7 +254,7 @@ grep -q 'LIBUSB_SPEED_UNKNOWN' "$QEMU_DIR/hw/usb/host-libusb.c"
   --extra-cflags="-fPIC -DANDROID -include $WORK/shm.h -I$PREFIX/include -I$PREFIX/include/glib-2.0 -I$PREFIX/lib/glib-2.0/include" \
   --extra-ldflags="-L$PREFIX/lib -Wl,-z,max-page-size=16384 $PREFIX/lib/libucontext.a $PREFIX/lib/libshm.a $PREFIX/lib/libqemujmp.a" \
   --prefix="$WORK/qemu-out" --target-list=aarch64-softmmu --enable-tcg --enable-slirp --enable-virtfs --enable-libusb --enable-pie \
-  --disable-docs --disable-gtk --disable-sdl --disable-vnc --disable-vhost-user --disable-plugins --with-coroutine=ucontext
+  --disable-docs --disable-gtk --disable-sdl --enable-vnc --disable-vhost-user --disable-plugins --with-coroutine=ucontext
  make -j"$JOBS" install
 )
 "$CC" --sysroot="$LLVM/sysroot" -target aarch64-linux-android26 -fPIE -pie -Wl,-z,max-page-size=16384 "$PODROID_DIR/podroid-bridge.c" -o "$WORK/qemu-out/libpodroid-bridge.so"
