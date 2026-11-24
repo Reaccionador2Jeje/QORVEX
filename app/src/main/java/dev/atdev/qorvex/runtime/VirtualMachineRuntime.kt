@@ -1,6 +1,7 @@
 package dev.atdev.qorvex.runtime
 
 import android.content.Context
+import android.app.ActivityManager
 import android.os.Build
 import dev.atdev.qorvex.storage.InstallationMediaManager
 import dev.atdev.qorvex.storage.VirtualDiskManager
@@ -131,6 +132,20 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
                 "This QEMU build supports ARM64 guests only. x86_64 guest support is not included yet."
             )
         }
+        // QEMU TCG allocates guest RAM in the Android process. Avoid asking
+        // Android to kill QORVEX by checking available device memory first.
+        val memoryManager = appContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val memoryInfo = ActivityManager.MemoryInfo().also(memoryManager::getMemoryInfo)
+        val requestedBytes = machine.memoryMiB.toLong() * 1024L * 1024L
+        val safeLimitBytes = (memoryInfo.availMem * 0.60).toLong()
+        if (requestedBytes > safeLimitBytes) {
+            val safeMiB = (safeLimitBytes / (1024L * 1024L)).coerceAtLeast(256L)
+            return@withLock RuntimeResult.Failure(
+                "Not enough free Android memory to start this VM safely. " +
+                    "Requested ${machine.memoryMiB} MiB; estimated safe limit is ${safeMiB} MiB. " +
+                    "Close other apps or lower the VM RAM."
+            )
+        }
         if (process?.isAlive == true) {
             return@withLock RuntimeResult.Failure("Another virtual machine is already running.")
         }
@@ -210,12 +225,14 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
                 }
             }
             RuntimeResult.Success
-        } catch (error: Throwable) {
+        } catch (error: Exception) {
             process = null
             runCatching { sessionJournal.clear() }
             mutableActiveMachineId.value = null
             mutableState.value = RuntimeState.FAILED
-            RuntimeResult.Failure(error.message ?: "Could not start the QEMU process.")
+            val detail = "${error.javaClass.simpleName}: ${error.message ?: "No error details"}"
+            appendConsoleLine("QEMU startup failed: $detail")
+            RuntimeResult.Failure("QEMU could not start. $detail")
         }
     }
 
