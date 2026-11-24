@@ -72,10 +72,10 @@ class MainActivity : ComponentActivity() {
 private fun QorvexTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
-            primary = Color(0xFF67E8F9),
-            secondary = Color(0xFF818CF8),
-            background = Color(0xFF080D18),
-            surface = Color(0xFF111827)
+            primary = Color(0xFF65E6D5),
+            secondary = Color(0xFF9AA8B5),
+            background = Color(0xFF101820),
+            surface = Color(0xFF1B252D)
         ),
         content = content
     )
@@ -132,10 +132,10 @@ private fun QorvexDashboard() {
         mediaTargetId = null
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF080D18)) {
+    Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF101820)) {
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -143,28 +143,10 @@ private fun QorvexDashboard() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("QORVEX", color = Color(0xFF67E8F9), fontSize = 28.sp, fontWeight = FontWeight.Black)
-                    Text("ATDEV • VIRTUAL PC", color = Color(0xFF94A3B8), fontSize = 11.sp, letterSpacing = 2.sp)
+                    Text("QORVEX", color = Color(0xFF65E6D5), fontSize = 28.sp, fontWeight = FontWeight.Black)
+                    Text("Virtual machine manager", color = Color(0xFF9AA8B5), fontSize = 12.sp)
                 }
                 Text("0.4.0-dev", color = Color(0xFF94A3B8), fontSize = 12.sp)
-            }
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF13243A))
-            ) {
-                Column(modifier = Modifier.padding(22.dp)) {
-                    Text("Your pocket-sized PC platform", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Create ARM64 virtual computers powered by QEMU TCG software emulation.",
-                        color = Color(0xFFB6C7D9), fontSize = 14.sp,
-                        style = androidx.compose.ui.text.TextStyle(lineHeight = 21.sp)
-                    )
-                    Spacer(Modifier.height(18.dp))
-                    Button(onClick = { showCreateDialog = true }) { Text("＋ Create virtual machine") }
-                }
             }
 
             Row(
@@ -172,15 +154,19 @@ private fun QorvexDashboard() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("YOUR MACHINES", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                Text("Machines", color = Color(0xFFE5EDF2), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                Button(onClick = { showCreateDialog = true }) { Text("＋ New") }
+            }
+
+, color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
                 Text("${machines.size} saved", color = Color(0xFF67E8F9), fontSize = 12.sp)
             }
 
             if (machines.isEmpty()) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF111827))
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1B252D))
                 ) {
                     Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("No virtual machines yet", color = Color.White, fontWeight = FontWeight.SemiBold)
@@ -319,10 +305,10 @@ private fun MachineCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF111827))
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1B252D))
     ) {
-        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(machine.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                 Text("SAVED", color = Color(0xFF67E8F9), fontSize = 10.sp, fontWeight = FontWeight.Bold)
@@ -357,9 +343,9 @@ private fun MachineCard(
 @Composable
 private fun CreateMachineDialog(onDismiss: () -> Unit, onCreate: (VirtualMachine) -> Unit) {
     var name by remember { mutableStateOf("My first PC") }
-    var memory by remember { mutableStateOf("2048") }
+    var memory by remember { mutableStateOf("512") }
     var cores by remember { mutableStateOf("2") }
-    var disk by remember { mutableStateOf("16") }
+    var disk by remember { mutableStateOf("8") }
     var architecture by remember { mutableStateOf(GuestArchitecture.AARCH64) }
     var error by remember { mutableStateOf<String?>(null) }
 
