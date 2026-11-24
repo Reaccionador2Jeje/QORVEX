@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -94,6 +95,13 @@ private fun QorvexDashboard() {
     val scope = rememberCoroutineScope()
     val runtime = remember { QorvexRuntimeService.getRuntime(context) }
     val runtimeState by runtime.state.collectAsState()
+    LaunchedEffect(runtimeState) {
+        if (runtimeState == RuntimeState.FAILED) {
+            notice = "QEMU failed or crashed. Check the serial console below for the exit code and details."
+        } else if (runtimeState == RuntimeState.EXITED) {
+            notice = "The virtual machine has exited. Check the serial console for its final output."
+        }
+    }
     val activeMachineId by runtime.activeMachineId.collectAsState()
     val consoleText by runtime.consoleText.collectAsState()
     val runtimeCapabilities = remember { runtime.getCapabilities() }
