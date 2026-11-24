@@ -44,6 +44,10 @@ object QemuCommandBuilder {
             }
             addAll(listOf("-netdev", "user,id=net0"))
             addAll(listOf("-device", "virtio-net-device,netdev=net0"))
+            // ARM virt exposes a real guest display and absolute touch input devices.
+            addAll(listOf("-device", "virtio-gpu-device"))
+            addAll(listOf("-device", "virtio-keyboard-device"))
+            addAll(listOf("-device", "virtio-tablet-device"))
             // Expose QEMU framebuffer through an unauthenticated VNC server bound only to loopback.
             // Android connects locally; the guest display is never exposed to the network.
             addAll(listOf("-display", "none"))
