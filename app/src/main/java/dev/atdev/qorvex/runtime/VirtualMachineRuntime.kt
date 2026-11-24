@@ -118,7 +118,7 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
             availability = RuntimeAvailability.READY,
             supportedArchitectures = setOf(GuestArchitecture.AARCH64.qemuTarget),
             hardwareAccelerationAvailable = false,
-            detail = "QEMU ARM64 is ready. TCG software emulation is enabled; this build exposes the serial console."
+            detail = "QEMU ARM64 is ready. TCG software emulation and the loopback VNC framebuffer frontend are enabled."
         )
     }
 
