@@ -40,6 +40,12 @@ else
     "$WORK/venv/bin/python" -m pip install --disable-pip-version-check -r "$EDK2_DIR/pip-requirements.txt"
 fi
 export PATH="$WORK/venv/bin:$PATH"
+# EDK II AARCH64 firmware must use the GNU cross-compiler, not host x86_64 gcc.
+export GCC5_AARCH64_PREFIX="${GCC5_AARCH64_PREFIX:-aarch64-linux-gnu-}"
+command -v "${GCC5_AARCH64_PREFIX}gcc" >/dev/null || {
+    echo "Missing AARCH64 cross compiler: ${GCC5_AARCH64_PREFIX}gcc" >&2
+    exit 1
+}
 
 # PCCTS 1.33 relies on pre-C23 empty-parameter-list semantics. Newer GCC
 # defaults may interpret () as a zero-argument prototype, breaking its
