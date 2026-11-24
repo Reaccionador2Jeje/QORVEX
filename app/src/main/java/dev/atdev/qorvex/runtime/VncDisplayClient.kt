@@ -93,7 +93,7 @@ class VncDisplayClient : Closeable {
         synchronized(writeLock) {
             output.writeByte(0) // SetPixelFormat
             output.writeByte(0); output.writeByte(0); output.writeByte(0)
-            output.writeByte(32); output.writeByte(24); output.writeByte(1); output.writeByte(1)
+            output.writeByte(32); output.writeByte(24); output.writeByte(0); output.writeByte(1)
             output.writeShort(255); output.writeShort(255); output.writeShort(255)
             output.writeByte(16); output.writeByte(8); output.writeByte(0)
             output.write(ByteArray(3))
