@@ -351,7 +351,7 @@ private fun CreateMachineDialog(onDismiss: () -> Unit, onCreate: (VirtualMachine
     var memory by remember { mutableStateOf("512") }
     var cores by remember { mutableStateOf("2") }
     var disk by remember { mutableStateOf("8") }
-    var architecture by remember { mutableStateOf(GuestArchitecture.AARCH64) }
+    val architecture = GuestArchitecture.AARCH64
     var error by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
@@ -363,24 +363,13 @@ private fun CreateMachineDialog(onDismiss: () -> Unit, onCreate: (VirtualMachine
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedTextField(value = name, onValueChange = { name = it; error = null }, label = { Text("Machine name") }, singleLine = true)
-                Text("Guest architecture", color = Color(0xFF94A3B8), fontSize = 12.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (architecture == GuestArchitecture.AARCH64) {
-                        Button(onClick = { architecture = GuestArchitecture.AARCH64 }) { Text("ARM64") }
-                    } else {
-                        OutlinedButton(onClick = { architecture = GuestArchitecture.AARCH64 }) { Text("ARM64") }
-                    }
-                    if (architecture == GuestArchitecture.X86_64) {
-                        Button(onClick = { architecture = GuestArchitecture.X86_64 }) { Text("x86_64") }
-                    } else {
-                        OutlinedButton(onClick = { architecture = GuestArchitecture.X86_64 }) { Text("x86_64") }
-                    }
-                }
+                Text("Guest architecture", color = Color(0xFF9AA8B5), fontSize = 12.sp)
+                Text("ARM64 (AArch64)", color = Color(0xFFE5EDF2), fontSize = 15.sp, fontWeight = FontWeight.Medium)
                 NumberField("Memory (MiB)", memory, { memory = it; error = null })
                 NumberField("CPU cores", cores, { cores = it; error = null })
                 NumberField("Virtual disk (GiB)", disk, { disk = it; error = null })
                 error?.let { Text(it, color = Color(0xFFFCA5A5), fontSize = 12.sp) }
-                Text("QEMU currently runs ARM64 guests using software emulation. x86_64 profiles are saved but cannot boot in this build.", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                Text("QEMU uses software emulation. VM startup needs enough free Android RAM.", color = Color(0xFF9AA8B5), fontSize = 11.sp)
             }
         },
         confirmButton = {
