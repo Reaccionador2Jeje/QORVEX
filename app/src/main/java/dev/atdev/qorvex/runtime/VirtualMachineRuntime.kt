@@ -189,6 +189,10 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
                 // Persist before spawning QEMU. If Android kills the app process,
                 // the next launch can identify this VM as an interrupted session.
                 sessionJournal.begin(machine.id, diskInfo.capacityBytes)
+                appendConsoleLine(
+                    "Launching QEMU ARM64: ${machine.name}, ${machine.memoryMiB} MiB RAM, " +
+                        "${machine.cpuCores} CPU cores."
+                )
                 val child = ProcessBuilder(command)
                     .directory(appContext.filesDir)
                     .redirectErrorStream(true)
@@ -220,7 +224,12 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
                         } else {
                             RuntimeState.FAILED
                         }
-                        appendConsoleLine("QEMU exited with code $exitCode.")
+                        val exitHint = when (exitCode) {
+                            137 -> " (process was killed; Android memory pressure is a possible cause)"
+                            139 -> " (native segmentation fault)"
+                            else -> ""
+                        }
+                        appendConsoleLine("QEMU exited with code $exitCode$exitHint.")
                     }
                 }
             }
