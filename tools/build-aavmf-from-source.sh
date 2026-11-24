@@ -56,6 +56,16 @@ for pccts_makefile in \
     fi
 done
 
+# Newer GCC diagnoses EDK II's mutable pointer receiving strstr's const result.
+# Ptr0 is only used for this read-only extension check, so make it const-correct.
+EFIROM_SOURCE="$EDK2_DIR/BaseTools/Source/C/EfiRom/EfiRom.c"
+if grep -q '^  CHAR8     \*Ptr0;' "$EFIROM_SOURCE"; then
+    sed -i 's/^  CHAR8     \*Ptr0;/  CONST CHAR8 *Ptr0;/' "$EFIROM_SOURCE"
+elif ! grep -q '^  CONST CHAR8 \*Ptr0;' "$EFIROM_SOURCE"; then
+    echo "Unexpected EfiRom Ptr0 declaration; refusing an unsafe patch" >&2
+    exit 1
+fi
+
 echo "Building AAVMF from EDK II commit $EDK2_COMMIT..."
 make -C "$EDK2_DIR/BaseTools" -j"$(getconf _NPROCESSORS_ONLN)"
 (
