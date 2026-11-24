@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Native host build of the QORVEX Android ARM64 QEMU runtime. No Docker.
+# Native Android ARM64 host build of QEMU with ARM64 and x86_64 guest targets. No Docker.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="${QORVEX_QEMU_WORKDIR:-${RUNNER_TEMP:-/tmp}/qorvex-qemu-build}"
 PODROID_REPO="https://github.com/ExTV/Podroid.git"
@@ -253,13 +253,16 @@ grep -q 'LIBUSB_SPEED_UNKNOWN' "$QEMU_DIR/hw/usb/host-libusb.c"
  ./configure --cc="$CC" --cross-prefix="$LLVM/bin/llvm-" \
   --extra-cflags="-fPIC -DANDROID -include $WORK/shm.h -I$PREFIX/include -I$PREFIX/include/glib-2.0 -I$PREFIX/lib/glib-2.0/include" \
   --extra-ldflags="-L$PREFIX/lib -Wl,-z,max-page-size=16384 $PREFIX/lib/libucontext.a $PREFIX/lib/libshm.a $PREFIX/lib/libqemujmp.a" \
-  --prefix="$WORK/qemu-out" --target-list=aarch64-softmmu --enable-tcg --enable-slirp --enable-virtfs --enable-libusb --enable-pie \
+  --prefix="$WORK/qemu-out" --target-list=aarch64-softmmu,x86_64-softmmu --enable-tcg --enable-slirp --enable-virtfs --enable-libusb --enable-pie \
   --disable-docs --disable-gtk --disable-sdl --enable-vnc --disable-vhost-user --disable-plugins --with-coroutine=ucontext
  make -j"$JOBS" install
 )
 "$CC" --sysroot="$LLVM/sysroot" -target aarch64-linux-android26 -fPIE -pie -Wl,-z,max-page-size=16384 "$PODROID_DIR/podroid-bridge.c" -o "$WORK/qemu-out/libpodroid-bridge.so"
 "$CC" --sysroot="$LLVM/sysroot" -target aarch64-linux-android26 -fPIE -pie -Wl,-z,max-page-size=16384 "$PODROID_DIR/podroid-launcher.c" -o "$WORK/qemu-out/libpodroid-launcher.so"
 cp "$WORK/qemu-out/bin/qemu-system-aarch64" "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so"
+cp "$WORK/qemu-out/bin/qemu-system-x86_64" "$OUT/jniLibs/arm64-v8a/libqemu-system-x86_64.so"
+mkdir -p "$OUT/assets/qemu"
+if [ -d "$WORK/qemu-out/share/qemu" ]; then cp -a "$WORK/qemu-out/share/qemu/." "$OUT/assets/qemu/"; fi
 cp "$WORK/qemu-out/lib/libslirp.so.0" "$OUT/jniLibs/arm64-v8a/libslirp.so"
 patchelf --set-soname libslirp.so "$OUT/jniLibs/arm64-v8a/libslirp.so"
 patchelf --replace-needed libslirp.so.0 libslirp.so "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so"
@@ -268,13 +271,13 @@ cp "$WORK/qemu-out/libpodroid-launcher.so" "$OUT/jniLibs/arm64-v8a/"
 chmod 755 "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so"
 bash "$ROOT/tools/build-aavmf-from-source.sh"
 
-python3 - "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so" "$OUT/jniLibs/arm64-v8a/libslirp.so" <<'PY'
+python3 - "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so" "$OUT/jniLibs/arm64-v8a/libqemu-system-x86_64.so" "$OUT/jniLibs/arm64-v8a/libslirp.so" <<'PY'
 import struct,sys
 for path in sys.argv[1:]:
  d=open(path,"rb").read()
  if d[:4]!=b"\x7fELF" or d[4]!=2 or d[5]!=1: raise SystemExit(f"{path}: invalid ELF64")
  if struct.unpack_from("<H",d,18)[0]!=183: raise SystemExit(f"{path}: not AArch64")
- if path.endswith("libqemu-system-aarch64.so") and struct.unpack_from("<H",d,16)[0]!=3: raise SystemExit("QEMU must be ET_DYN")
+ if path.endswith(("libqemu-system-aarch64.so","libqemu-system-x86_64.so")) and struct.unpack_from("<H",d,16)[0]!=3: raise SystemExit("QEMU must be ET_DYN")
  po=struct.unpack_from("<Q",d,32)[0]; es=struct.unpack_from("<H",d,54)[0]; n=struct.unpack_from("<H",d,56)[0]; aligns=[]; interp=None
  for i in range(n):
   o=po+i*es; t=struct.unpack_from("<I",d,o)[0]
@@ -282,10 +285,10 @@ for path in sys.argv[1:]:
   elif t==3:
    a=struct.unpack_from("<Q",d,o+8)[0]; z=struct.unpack_from("<Q",d,o+32)[0]; interp=d[a:a+z].rstrip(b"\0").decode()
  if not aligns or any(a<16384 for a in aligns): raise SystemExit(f"{path}: bad 16 KiB alignment {aligns}")
- if path.endswith("libqemu-system-aarch64.so") and interp!="/system/bin/linker64": raise SystemExit(f"wrong interpreter: {interp}")
+ if path.endswith(("libqemu-system-aarch64.so","libqemu-system-x86_64.so")) and interp!="/system/bin/linker64": raise SystemExit(f"wrong interpreter: {interp}")
  print("Verified",path,"AArch64 16 KiB")
 PY
-for f in "$OUT/jniLibs/arm64-v8a/libslirp.so" "$OUT/jniLibs/arm64-v8a/libpodroid-bridge.so" "$OUT/jniLibs/arm64-v8a/libpodroid-launcher.so" "$OUT/assets/firmware/AAVMF_CODE.fd" "$OUT/assets/firmware/AAVMF_VARS.fd"; do
+for f in "$OUT/jniLibs/arm64-v8a/libqemu-system-x86_64.so" "$OUT/jniLibs/arm64-v8a/libslirp.so" "$OUT/jniLibs/arm64-v8a/libpodroid-bridge.so" "$OUT/jniLibs/arm64-v8a/libpodroid-launcher.so" "$OUT/assets/firmware/AAVMF_CODE.fd" "$OUT/assets/firmware/AAVMF_VARS.fd"; do
  test -s "$f" || { echo "Missing output $f" >&2; exit 1; }
 done
 echo "Docker-free QEMU runtime artifacts ready: $OUT"
