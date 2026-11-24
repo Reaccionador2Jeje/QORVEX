@@ -44,7 +44,10 @@ object QemuCommandBuilder {
             }
             addAll(listOf("-netdev", "user,id=net0"))
             addAll(listOf("-device", "virtio-net-device,netdev=net0"))
+            // Expose QEMU framebuffer through an unauthenticated VNC server bound only to loopback.
+            // Android connects locally; the guest display is never exposed to the network.
             addAll(listOf("-display", "none"))
+            addAll(listOf("-vnc", "127.0.0.1:0"))
             addAll(listOf("-serial", "stdio"))
             addAll(listOf("-monitor", "none"))
             if (qmpSocket != null) {
