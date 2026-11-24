@@ -15,6 +15,9 @@ It lets you create VM profiles, prepare virtual disks, import installation media
 - Attach a virtio virtual disk and optional read-only installation ISO.
 - Provide SLIRP user-mode networking.
 - Capture serial output in the in-app console.
+- Serve the guest framebuffer through QEMU VNC bound to `127.0.0.1` only.
+- Display the live framebuffer in the dashboard using a minimal RFB client (Raw 32-bit true-colour encoding).
+- Forward touch taps/drags as virtual pointer events and Android text input as virtual key events.
 - Keep an active QEMU process supervised by an Android foreground service with a persistent notification and a Stop VM action.
 - Request graceful shutdown through QMP, with process termination as a fallback.
 - Detect interrupted VM sessions and perform non-destructive virtual-disk container checks before a manual restart.
@@ -22,7 +25,7 @@ It lets you create VM profiles, prepare virtual disks, import installation media
 ## Current limitations
 
 - ARM64 guests only. x86_64 profiles cannot boot with the current runtime.
-- The frontend is serial-console only. A graphical framebuffer, touch keyboard, and pointer integration are not implemented.
+- The graphical frontend currently supports QEMU's loopback VNC server, raw framebuffer updates, touch pointer events, and text/Backspace/Enter key events. Advanced RFB encodings, clipboard sync, hardware mouse capture, and display scaling controls remain future work.
 - Audio, pause/resume, snapshots, and interactive QMP management are not implemented.
 - Disk checks validate the container file and its storage properties; they do not inspect or repair the guest filesystem.
 - TCG is software emulation and can be slow, especially on entry-level devices.
@@ -33,7 +36,7 @@ It lets you create VM profiles, prepare virtual disks, import installation media
 
 The Android app uses Kotlin, Jetpack Compose, and Gradle.
 
-The QEMU runtime is built separately for Android/Bionic ARM64 by `tools/build-qemu-android.sh`. It pins the Podroid QEMU build recipe, builds QEMU 11.1.2 and SLIRP, and checks the resulting ELF architecture and 16 KiB page alignment. UEFI firmware is built separately from the pinned EDK II source revision by `tools/build-aavmf-from-source.sh`; no prebuilt Debian firmware package is copied into the APK.
+The QEMU runtime is built separately for Android/Bionic ARM64 by `tools/build-qemu-android.sh`. VNC support is enabled for the local display bridge; the server binds to loopback only and is not exposed on the LAN. It pins the Podroid QEMU build recipe, builds QEMU 11.1.2 and SLIRP, and checks the resulting ELF architecture and 16 KiB page alignment. UEFI firmware is built separately from the pinned EDK II source revision by `tools/build-aavmf-from-source.sh`; no prebuilt Debian firmware package is copied into the APK.
 
 Requirements for the current build scripts: a Linux x86_64 host, Git, curl, Python 3 with `venv` and `pip`, GCC/G++, Make, Ninja, Meson, Autoconf/Automake/Libtool, NASM, ACPICA (`iasl`), UUID development headers, `patchelf`, and `readelf`. The QEMU runtime build no longer requires Docker.
 
