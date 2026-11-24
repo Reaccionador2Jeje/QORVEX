@@ -158,8 +158,13 @@ private fun QorvexDashboard() {
                 Button(onClick = { showCreateDialog = true }) { Text("＋ New") }
             }
 
-, color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
-                Text("${machines.size} saved", color = Color(0xFF67E8F9), fontSize = 12.sp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Saved machines", color = Color(0xFF9AA8B5), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text("${machines.size}", color = Color(0xFF65E6D5), fontSize = 12.sp)
             }
 
             if (machines.isEmpty()) {
