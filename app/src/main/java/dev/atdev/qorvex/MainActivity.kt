@@ -157,6 +157,8 @@ private fun QorvexDashboard() {
                 Text("0.4.0-dev", color = Color(0xFF94A3B8), fontSize = 12.sp)
             }
 
+            if (activeMachineId != null) VncDisplayPanel()
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
