@@ -83,7 +83,6 @@ internal fun VncDisplayPanel() {
                         .pointerInput(client, currentBitmap) {
                             // Keep one pointer event loop so taps, drags, and mouse hover
                             // don't compete with separate gesture detectors.
-                            var buttons = 0
                             awaitPointerEventScope {
                                 while (true) {
                                     val event = awaitPointerEvent()
@@ -91,20 +90,13 @@ internal fun VncDisplayPanel() {
                                     val x = (change.position.x / size.width * client.framebufferWidth).toInt()
                                     val y = (change.position.y / size.height * client.framebufferHeight).toInt()
 
-                                    when (event.type) {
-                                        PointerEventType.Press -> {
-                                            buttons = 1
-                                            client.sendPointer(x, y, buttons)
-                                        }
-                                        PointerEventType.Move -> {
-                                            client.sendPointer(x, y, buttons)
-                                        }
-                                        PointerEventType.Release -> {
-                                            client.sendPointer(x, y, buttons)
-                                            buttons = 0
-                                            client.sendPointer(x, y, buttons)
-                                        }
-                                    }
+                                    // RFB button mask: left=1, middle=2, right=4.
+                                    // Compose's primary/tertiary/secondary map to left/middle/right.
+                                    val buttons =
+                                        (if (event.buttons.isPrimaryPressed) 1 else 0) or
+                                        (if (event.buttons.isTertiaryPressed) 2 else 0) or
+                                        (if (event.buttons.isSecondaryPressed) 4 else 0)
+                                    client.sendPointer(x, y, buttons)
                                 }
                             }
                         }
