@@ -2,16 +2,17 @@
 
 GitHub Releases is the active distribution channel for QORVEX. F-Droid packaging and its CI workflow are paused.
 
-## Creating a preview
+## Automatic publishing
 
-1. Merge the tested changes into `main`.
-2. Create and push a version tag, for example `v0.4.0-preview.1`.
-3. The Android workflow builds the QEMU ARM64 runtime, runs JVM unit tests, packages the Android debug APK, and uploads it as a workflow artifact.
-4. For a `v*` tag, the workflow publishes a GitHub **pre-release** containing:
-   - `QORVEX-vX.Y.Z-preview.N-debug.apk`
-   - `SHA256SUMS.txt`
+Every successful non-PR build pushed to `main` or `fdroid/preparation-five-developments` automatically creates a GitHub **pre-release**. A successful `workflow_dispatch` run does the same. Version tags matching `v*` also publish a pre-release using that exact tag.
 
-A failed build or test prevents the release job from running.
+Continuous builds receive unique tags in the form `continuous-RUN_NUMBER-RUN_ATTEMPT`, so every successful run can publish independently without replacing previous releases. Re-running a workflow creates a new release tag for that attempt. Pull-request builds still compile and test, but do not publish public releases.
+
+Each release contains:
+- `QORVEX-<release-tag>-debug.apk`
+- `SHA256SUMS.txt`
+
+The workflow first builds the QEMU ARM64 runtime, then runs JVM unit tests and packages the Android APK. Release publication runs only after the build and tests succeed. If the release already exists (for example, a rerun of a version-tag build), the workflow replaces its assets.
 
 ## Why previews are debug-signed
 
