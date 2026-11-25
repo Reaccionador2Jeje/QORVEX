@@ -7,14 +7,15 @@ FUNCIONES
 • Importar imágenes ISO de instalación
 • Ejecutar sistemas invitados ARM64 mediante emulación por software TCG de QEMU
 • Usar firmware UEFI, almacenamiento virtio y redes SLIRP
-• Consultar la salida serial del sistema invitado
+• Consultar la salida serial y visualizar el framebuffer gráfico del sistema invitado
+• Enviar eventos táctiles y texto al sistema invitado
 • Mantener una máquina virtual activa mediante un servicio Android en primer plano
 • Solicitar el apagado ordenado desde la aplicación o su notificación
 • Detectar sesiones interrumpidas y comprobar el contenedor del disco antes de reiniciar
 
 LIMITACIONES
 • Solo admite sistemas invitados ARM64
-• Solo dispone de consola serial; todavía no incluye pantalla gráfica ni controles táctiles
+• La interfaz gráfica admite actualizaciones básicas del framebuffer y entrada táctil/de texto; las funciones avanzadas de pantalla y entrada siguen siendo limitadas
 • La emulación por software puede ser lenta en dispositivos de menor potencia
 • Las comprobaciones del disco no verifican ni reparan el sistema de archivos invitado
 • La compatibilidad depende de la ISO y de la máquina ARM64 virt de QEMU
