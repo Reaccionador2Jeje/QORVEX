@@ -140,7 +140,7 @@ private fun QorvexDashboard() {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("QORVEX", color = Color(0xFF65E6D5), fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                    Text(if (selectedSection == "machines") "Virtual machines" else "Settings", color = Color(0xFF9AA8B5, fontSize = 13.sp)
+                    Text(if (selectedSection == "machines") "Virtual machines" else "Settings", color = Color(0xFF9AA8B5), fontSize = 13.sp)
                 }
                 if (selectedSection == "machines") Button(onClick = { showCreateDialog = true }) { Text("＋ Create") }
             }
