@@ -10,6 +10,16 @@ import java.io.File
 import java.nio.file.Files
 
 class QemuCommandBuilderTest {
+    private fun assertDefaultNatNetwork(args: List<String>, expectedNic: String) {
+        assertEquals(1, args.count { it == "-netdev" })
+        assertTrue(args.containsAll(listOf(
+            "-netdev",
+            "user,id=net0,net=10.0.2.0/24,host=10.0.2.2,dhcpstart=10.0.2.15,dns=10.0.2.3,ipv6=off"
+        )))
+        assertTrue(args.containsAll(listOf("-device", expectedNic)))
+        assertFalse(args.any { it.startsWith("tap,") || it.startsWith("bridge,") })
+    }
+
     @Test
     fun buildsArm64CommandWithFirmwareDiskIsoAndSerialConsole() {
         val directory = Files.createTempDirectory("qorvex-qemu-test").toFile()
@@ -44,6 +54,7 @@ class QemuCommandBuilderTest {
         assertTrue(args.containsAll(listOf("-device", "virtio-keyboard-device")))
         assertTrue(args.containsAll(listOf("-device", "virtio-tablet-device")))
         assertTrue(args.containsAll(listOf("-qmp", "unix:${qmp.absolutePath},server=on,wait=off")))
+        assertDefaultNatNetwork(args, "virtio-net-device,netdev=net0")
         assertFalse(args.any { it == "mon:stdio" })
     }
 
@@ -66,10 +77,11 @@ class QemuCommandBuilderTest {
 
         assertFalse(args.contains("-boot"))
         assertFalse(args.any { it.contains("cdrom") })
+        assertDefaultNatNetwork(args, "virtio-net-device,netdev=net0")
     }
 
     @Test
-    fun buildsX8664PcCommandWithIdeDiskBiosAndUsbInput() {
+    fun buildsX8664PcCommandWithVirtioNetworkAndNat() {
         val directory = Files.createTempDirectory("qorvex-qemu-x86").toFile()
         val executable = File(directory, "qemu-system-x86_64").apply { writeText("binary") }
         val disk = File(directory, "pc-disk.raw").apply { writeText("disk") }
@@ -95,5 +107,7 @@ class QemuCommandBuilderTest {
         assertTrue(args.containsAll(listOf("-device", "usb-kbd")))
         assertTrue(args.containsAll(listOf("-device", "usb-tablet")))
         assertTrue(args.containsAll(listOf("-display", "none", "-vnc", "127.0.0.1:0")))
+        assertDefaultNatNetwork(args, "virtio-net-pci,netdev=net0")
+        assertFalse(args.any { it.startsWith("e1000,") })
     }
 }
