@@ -14,6 +14,7 @@ data class VirtualDiskSnapshot(
     val displayName: String,
     val createdAtEpochMs: Long,
     val capacityBytes: Long,
+    val sha256: String?,
     val file: File
 )
 
@@ -47,6 +48,7 @@ class VirtualDiskSnapshotManager(context: Context) {
                         displayName = json.optString("displayName", "Snapshot"),
                         createdAtEpochMs = json.getLong("createdAtEpochMs"),
                         capacityBytes = json.getLong("capacityBytes"),
+                        sha256 = json.optString("sha256").takeIf { it.matches(Regex("[a-fA-F0-9]{64}")) },
                         file = image
                     )
                 }.getOrNull()
@@ -74,7 +76,7 @@ class VirtualDiskSnapshotManager(context: Context) {
         val image = File(directory, "$id.raw")
         val temporary = File(directory, "$id.creating")
         try {
-            copySparse(source, temporary)
+            val sha256 = copySparse(source, temporary)
             check(temporary.length() == source.length()) { "Snapshot capacity verification failed." }
             check(temporary.renameTo(image)) { "Could not finalize the snapshot image." }
             val created = System.currentTimeMillis()
@@ -83,13 +85,14 @@ class VirtualDiskSnapshotManager(context: Context) {
                 .put("displayName", displayName.trim().take(64))
                 .put("createdAtEpochMs", created)
                 .put("capacityBytes", source.length())
+                .put("sha256", sha256)
             val metadataTemp = File(directory, "$id.json.creating")
             metadataTemp.writeText(metadata.toString())
             RandomAccessFile(metadataTemp, "rw").use { it.fd.sync() }
             check(metadataTemp.renameTo(File(directory, "$id.json"))) {
                 "Could not save snapshot metadata."
             }
-            return VirtualDiskSnapshot(id, displayName.trim().take(64), created, source.length(), image)
+            return VirtualDiskSnapshot(id, displayName.trim().take(64), created, source.length(), sha256, image)
         } catch (error: Throwable) {
             temporary.delete()
             image.delete()
@@ -117,7 +120,10 @@ class VirtualDiskSnapshotManager(context: Context) {
             "A previous interrupted restore needs review before another restore can run."
         }
         try {
-            copySparse(snapshot.file, staged)
+            val restoredSha256 = copySparse(snapshot.file, staged)
+            require(snapshot.sha256 == null || restoredSha256.equals(snapshot.sha256, ignoreCase = true)) {
+                "Snapshot checksum verification failed; the current disk was not changed."
+            }
             val expectedCapacity = machine.diskSizeGiB.toLong() * GIB
             check(staged.length() == expectedCapacity) { "Restored disk capacity verification failed." }
             if (target.exists()) require(target.length() == expectedCapacity) {
@@ -158,8 +164,9 @@ class VirtualDiskSnapshotManager(context: Context) {
     }
 
     /** Copy only non-zero 1 MiB blocks, preserving sparse allocation on Android filesystems. */
-    private fun copySparse(source: File, destination: File) {
+    private fun copySparse(source: File, destination: File): String {
         require(source.isFile && source.canRead()) { "Snapshot source is not readable." }
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
         RandomAccessFile(source, "r").use { input ->
             RandomAccessFile(destination, "rw").use { output ->
                 output.setLength(0L)
@@ -170,6 +177,7 @@ class VirtualDiskSnapshotManager(context: Context) {
                     val count = minOf(buffer.size.toLong(), input.length() - offset).toInt()
                     input.seek(offset)
                     input.readFully(buffer, 0, count)
+                    digest.update(buffer, 0, count)
                     var hasData = false
                     for (index in 0 until count) {
                         if (buffer[index].toInt() != 0) { hasData = true; break }
@@ -183,6 +191,7 @@ class VirtualDiskSnapshotManager(context: Context) {
                 output.fd.sync()
             }
         }
+        return digest.digest().joinToString("") { byte -> "%02x".format(byte) }
     }
 
     private companion object {
