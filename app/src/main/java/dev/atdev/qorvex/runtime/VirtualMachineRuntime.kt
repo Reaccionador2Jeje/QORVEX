@@ -335,6 +335,26 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
         return code to vars
     }
 
+    private fun prepareQemuDataDirectory(): File {
+        val destination = File(appContext.filesDir, "qemu-pc-bios")
+        if (destination.isDirectory && destination.list()?.isNotEmpty() == true) return destination
+        check(destination.isDirectory || destination.mkdirs()) { "Could not create QEMU PC BIOS directory." }
+        fun copyAssetTree(assetPath: String, target: File) {
+            val entries = appContext.assets.list(assetPath).orEmpty()
+            if (entries.isEmpty()) {
+                appContext.assets.open(assetPath).use { input ->
+                    target.parentFile?.let { check(it.isDirectory || it.mkdirs()) }
+                    target.outputStream().use { output -> input.copyTo(output) }
+                }
+            } else {
+                check(target.isDirectory || target.mkdirs())
+                entries.forEach { entry -> copyAssetTree("$assetPath/$entry", File(target, entry)) }
+            }
+        }
+        copyAssetTree("qemu", destination)
+        return destination
+    }
+
     private fun qmpSocketFor(machineId: String): File =
         File(File(appContext.filesDir, "qmp"), "${safeMachineKey(machineId)}.sock")
 
