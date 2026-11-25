@@ -12,6 +12,7 @@ import java.nio.file.Files
 class QemuCommandBuilderTest {
     private fun assertDefaultNatNetwork(args: List<String>, expectedNic: String) {
         assertEquals(1, args.count { it == "-netdev" })
+        assertTrue(args.indexOf("-netdev") < args.indexOf("-device"))
         assertTrue(args.containsAll(listOf(
             "-netdev",
             "user,id=net0,net=10.0.2.0/24,host=10.0.2.2,dhcpstart=10.0.2.15,dns=10.0.2.3,ipv6=off"
