@@ -1,6 +1,9 @@
 package dev.atdev.qorvex
 
 import android.os.Bundle
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -32,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +58,8 @@ import dev.atdev.qorvex.runtime.RuntimeState
 import dev.atdev.qorvex.storage.InstallationMediaReader
 import dev.atdev.qorvex.storage.InstallationMediaManager
 import dev.atdev.qorvex.storage.VirtualDiskManager
+import dev.atdev.qorvex.storage.VirtualDiskSnapshot
+import dev.atdev.qorvex.storage.VirtualDiskSnapshotManager
 import dev.atdev.qorvex.vm.GuestArchitecture
 import dev.atdev.qorvex.vm.VirtualMachine
 import dev.atdev.qorvex.vm.VirtualMachineRepository
@@ -72,10 +78,10 @@ class MainActivity : ComponentActivity() {
 private fun QorvexTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
-            primary = Color(0xFF67E8F9),
-            secondary = Color(0xFF818CF8),
-            background = Color(0xFF080D18),
-            surface = Color(0xFF111827)
+            primary = Color(0xFF65E6D5),
+            secondary = Color(0xFF9AA8B5),
+            background = Color(0xFF101820),
+            surface = Color(0xFF1B252D)
         ),
         content = content
     )
@@ -87,13 +93,27 @@ private fun QorvexDashboard() {
     val repository = remember { VirtualMachineRepository(context) }
     val machines = remember { mutableStateListOf<VirtualMachine>().apply { addAll(repository.getAll()) } }
     var showCreateDialog by remember { mutableStateOf(false) }
+    var selectedSection by remember { mutableStateOf("machines") }
     var notice by remember { mutableStateOf<String?>(null) }
     var mediaTargetId by remember { mutableStateOf<String?>(null) }
+    var restoreTarget by remember { mutableStateOf<Pair<VirtualMachine, String>?>(null) }
+    var snapshotManagerTarget by remember { mutableStateOf<VirtualMachine?>(null) }
+    var snapshotNameTarget by remember { mutableStateOf<VirtualMachine?>(null) }
+    var snapshotName by remember { mutableStateOf("Before changes") }
+    var snapshotRevision by remember { mutableStateOf(0) }
     val diskManager = remember { VirtualDiskManager(context) }
+    val snapshotManager = remember { VirtualDiskSnapshotManager(context) }
     val mediaManager = remember { InstallationMediaManager(context) }
     val scope = rememberCoroutineScope()
     val runtime = remember { QorvexRuntimeService.getRuntime(context) }
     val runtimeState by runtime.state.collectAsState()
+    LaunchedEffect(runtimeState) {
+        if (runtimeState == RuntimeState.FAILED) {
+            notice = "QEMU failed or crashed. Check the serial console below for the exit code and details."
+        } else if (runtimeState == RuntimeState.EXITED) {
+            notice = "The virtual machine has exited. Check the serial console for its final output."
+        }
+    }
     val activeMachineId by runtime.activeMachineId.collectAsState()
     val consoleText by runtime.consoleText.collectAsState()
     val runtimeCapabilities = remember { runtime.getCapabilities() }
@@ -129,58 +149,24 @@ private fun QorvexDashboard() {
                 }
             }
         }
-        mediaTargetId = null
     }
-
-    Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF080D18)) {
-        Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("QORVEX", color = Color(0xFF67E8F9), fontSize = 28.sp, fontWeight = FontWeight.Black)
-                    Text("ATDEV • VIRTUAL PC", color = Color(0xFF94A3B8), fontSize = 11.sp, letterSpacing = 2.sp)
+    Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF101820)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("QORVEX", color = Color(0xFF65E6D5), fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                    Text(if (selectedSection == "machines") "Virtual machines" else "Settings", color = Color(0xFF9AA8B5), fontSize = 13.sp)
                 }
-                Text("0.4.0-dev", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                if (selectedSection == "machines") Button(onClick = { showCreateDialog = true }) { Text("＋ QuickStart") }
             }
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF13243A))
-            ) {
-                Column(modifier = Modifier.padding(22.dp)) {
-                    Text("Your pocket-sized PC platform", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Create ARM64 virtual computers powered by QEMU TCG software emulation.",
-                        color = Color(0xFFB6C7D9), fontSize = 14.sp,
-                        style = androidx.compose.ui.text.TextStyle(lineHeight = 21.sp)
-                    )
-                    Spacer(Modifier.height(18.dp))
-                    Button(onClick = { showCreateDialog = true }) { Text("＋ Create virtual machine") }
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("YOUR MACHINES", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
-                Text("${machines.size} saved", color = Color(0xFF67E8F9), fontSize = 12.sp)
-            }
-
+            if (activeMachineId != null) VncDisplayPanel()
+            Column(modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (selectedSection == "machines") {
             if (machines.isEmpty()) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF111827))
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1B252D))
                 ) {
                     Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("No virtual machines yet", color = Color.White, fontWeight = FontWeight.SemiBold)
@@ -189,6 +175,10 @@ private fun QorvexDashboard() {
                 }
             } else {
                 machines.forEach { machine ->
+                    val snapshots = remember(machine.id, snapshotRevision) {
+                        runCatching { snapshotManager.listSnapshots(machine) }.getOrDefault(emptyList())
+                    }
+                    val latestSnapshot = snapshots.firstOrNull()
                     val mediaName = mediaManager.inspect(machine)?.let { imported ->
                         "${imported.displayName} • ${formatBytes(imported.sizeBytes)} • SHA-256 recorded"
                     } ?: machine.installationMediaUri?.let { raw ->
@@ -199,6 +189,14 @@ private fun QorvexDashboard() {
                         machine = machine,
                         mediaName = mediaName,
                         diskInfo = runCatching { diskManager.inspect(machine) }.getOrNull(),
+                        snapshotCount = snapshots.size,
+                        latestSnapshot = latestSnapshot,
+                        snapshotsEnabled = activeMachineId == null && runtimeState != RuntimeState.STARTING && runtimeState != RuntimeState.STOPPING,
+                        onCreateSnapshot = {
+                            snapshotName = "Before changes"
+                            snapshotNameTarget = machine
+                        },
+                        onManageSnapshots = { snapshotManagerTarget = machine },
                         onSelectMedia = {
                             mediaTargetId = machine.id
                             mediaPicker.launch(arrayOf("application/x-iso9660-image", "application/octet-stream", "*/*"))
@@ -255,11 +253,28 @@ private fun QorvexDashboard() {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(message, color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        TextButton(onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val fullError = buildString {
+                                appendLine("QORVEX error")
+                                appendLine(message)
+                                if (consoleText.isNotBlank()) {
+                                    appendLine()
+                                    appendLine("QEMU console:")
+                                    append(consoleText)
+                                }
+                            }
+                            clipboard.setPrimaryClip(ClipData.newPlainText("QORVEX error", fullError))
+                            notice = "Error copied to clipboard."
+                        }) { Text("Copy error") }
                         TextButton(onClick = { notice = null }) { Text("OK") }
                     }
                 }
             }
 
+
+                } else {
+                    Text("Settings", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(12.dp))
             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF111827))) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -285,13 +300,40 @@ private fun QorvexDashboard() {
                             lineHeight = 14.sp,
                             maxLines = 18
                         )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    val report = buildString {
+                                        appendLine("QORVEX diagnostic report")
+                                        appendLine("Runtime state: ${runtimeState.name}")
+                                        appendLine("Active machine: ${activeMachineId ?: "none"}")
+                                        appendLine()
+                                        appendLine("QEMU console:")
+                                        append(consoleText.ifBlank { "No console output recorded." })
+                                    }
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("QORVEX diagnostic report", report))
+                                    notice = "Console and runtime details copied to clipboard."
+                                }
+                            ) { Text("Copy console") }
+                        }
                     }
                 }
             }
             Text("Built by AtDev", color = Color(0xFF64748B), fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { selectedSection = "machines" }) { Text(if (selectedSection == "machines") "▣  Machines" else "Machines", color = if (selectedSection == "machines") Color(0xFF65E6D5) else Color(0xFF9AA8B5)) }
+                TextButton(onClick = { selectedSection = "settings" }) { Text(if (selectedSection == "settings") "⚙  Settings" else "Settings", color = if (selectedSection == "settings") Color(0xFF65E6D5) else Color(0xFF9AA8B5)) }
+            }
         }
     }
-
     if (showCreateDialog) {
         CreateMachineDialog(
             onDismiss = { showCreateDialog = false },
@@ -303,6 +345,94 @@ private fun QorvexDashboard() {
             }
         )
     }
+    snapshotNameTarget?.let { machine ->
+        AlertDialog(
+            onDismissRequest = { snapshotNameTarget = null },
+            title = { Text("Create disk snapshot") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("The VM must be stopped. This creates a separate disk copy and may use additional storage.", color = Color(0xFF94A3B8))
+                    OutlinedTextField(
+                        value = snapshotName,
+                        onValueChange = { snapshotName = it.take(64) },
+                        label = { Text("Snapshot name") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val name = snapshotName.trim()
+                        if (name.isNotEmpty()) {
+                            snapshotNameTarget = null
+                            scope.launch {
+                                runCatching {
+                                    withContext(Dispatchers.IO) {
+                                        snapshotManager.createSnapshot(machine, name)
+                                    }
+                                }.onSuccess { created ->
+                                    snapshotRevision++
+                                    notice = "Snapshot created: ${created.displayName} • ${formatBytes(created.capacityBytes)} logical capacity."
+                                }.onFailure { notice = "Snapshot failed: ${it.message}" }
+                            }
+                        }
+                    },
+                    enabled = snapshotName.isNotBlank() && activeMachineId == null &&
+                        runtimeState != RuntimeState.STARTING && runtimeState != RuntimeState.STOPPING
+                ) { Text("Create snapshot") }
+            },
+            dismissButton = {
+                TextButton(onClick = { snapshotNameTarget = null }) { Text("Cancel") }
+            }
+        )
+    }
+    snapshotManagerTarget?.let { machine ->
+        val snapshots = remember(machine.id, snapshotRevision) {
+            runCatching { snapshotManager.listSnapshots(machine) }.getOrDefault(emptyList())
+        }
+        SnapshotManagerDialog(
+            machine = machine,
+            snapshots = snapshots,
+            actionsEnabled = activeMachineId == null && runtimeState != RuntimeState.STARTING && runtimeState != RuntimeState.STOPPING,
+            onDismiss = { snapshotManagerTarget = null },
+            onRestore = { snapshot ->
+                snapshotManagerTarget = null
+                restoreTarget = machine to snapshot.id
+            },
+            onDelete = { snapshot ->
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) { snapshotManager.deleteSnapshot(machine, snapshot.id) }
+                    }.onSuccess { deleted ->
+                        snapshotRevision++
+                        notice = if (deleted) "Snapshot deleted." else "Could not delete snapshot files."
+                    }.onFailure { notice = "Snapshot deletion failed: ${it.message}" }
+                }
+            }
+        )
+    }
+    restoreTarget?.let { (machine, snapshotId) ->
+        AlertDialog(
+            onDismissRequest = { restoreTarget = null },
+            title = { Text("Restore disk snapshot?") },
+            text = { Text("The current disk contents of ${machine.name} will be replaced by this saved snapshot. The VM must remain stopped. This cannot be undone unless another snapshot exists.") },
+            confirmButton = {
+                Button(onClick = {
+                    restoreTarget = null
+                    scope.launch {
+                        runCatching { withContext(Dispatchers.IO) { snapshotManager.restoreSnapshot(machine, snapshotId) } }
+                            .onSuccess {
+                                snapshotRevision++
+                                notice = "Snapshot restored. The VM disk now contains the selected saved state."
+                            }
+                            .onFailure { notice = "Snapshot restore failed: ${it.message}" }
+                    }
+                }) { Text("Restore disk") }
+            },
+            dismissButton = { TextButton(onClick = { restoreTarget = null }) { Text("Cancel") } }
+        )
+    }
 }
 
 @Composable
@@ -310,6 +440,11 @@ private fun MachineCard(
     machine: VirtualMachine,
     mediaName: String,
     diskInfo: dev.atdev.qorvex.storage.VirtualDiskInfo?,
+    snapshotCount: Int,
+    latestSnapshot: VirtualDiskSnapshot?,
+    snapshotsEnabled: Boolean,
+    onCreateSnapshot: () -> Unit,
+    onManageSnapshots: () -> Unit,
     onDelete: () -> Unit,
     isRunning: Boolean,
     onStart: () -> Unit,
@@ -319,10 +454,10 @@ private fun MachineCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF111827))
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1B252D))
     ) {
-        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(machine.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                 Text("SAVED", color = Color(0xFF67E8F9), fontSize = 10.sp, fontWeight = FontWeight.Bold)
@@ -347,49 +482,124 @@ private fun MachineCard(
                 OutlinedButton(onClick = onSelectMedia, enabled = !isRunning) { Text("Select ISO") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onCreateDisk) { Text(if (diskInfo != null) "Verify disk" else "Create disk") }
-                OutlinedButton(onClick = onDelete, enabled = !isRunning) { Text("Delete profile") }
+                OutlinedButton(onClick = onCreateDisk, enabled = snapshotsEnabled) { Text(if (diskInfo != null) "Verify disk" else "Create disk") }
+                OutlinedButton(onClick = onDelete, enabled = !isRunning && snapshotsEnabled) { Text("Delete profile") }
+            }
+            Text("Snapshots: $snapshotCount", color = Color(0xFF9AA8B5), fontSize = 11.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onCreateSnapshot, enabled = snapshotsEnabled && diskInfo != null) { Text("＋ Snapshot") }
+                OutlinedButton(onClick = onManageSnapshots, enabled = snapshotCount > 0) { Text("Manage snapshots") }
+            }
+            if (latestSnapshot != null) {
+                Text("Latest: ${latestSnapshot.displayName} • ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(latestSnapshot.createdAtEpochMs))}", color = Color(0xFF718096), fontSize = 10.sp)
             }
         }
     }
 }
 
+
+@Composable
+private fun SnapshotManagerDialog(
+    machine: VirtualMachine,
+    snapshots: List<VirtualDiskSnapshot>,
+    actionsEnabled: Boolean,
+    onDismiss: () -> Unit,
+    onRestore: (VirtualDiskSnapshot) -> Unit,
+    onDelete: (VirtualDiskSnapshot) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Snapshots • ${machine.name}") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (snapshots.isEmpty()) {
+                    Text("No valid snapshots found. Incomplete or damaged snapshot metadata is hidden.", color = Color(0xFF94A3B8))
+                }
+                snapshots.forEach { snapshot ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF24313A)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Text(snapshot.displayName, color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                java.text.DateFormat.getDateTimeInstance().format(java.util.Date(snapshot.createdAtEpochMs)),
+                                color = Color(0xFF94A3B8),
+                                fontSize = 11.sp
+                            )
+                            Text("${formatBytes(snapshot.capacityBytes)} logical disk image", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { onRestore(snapshot) }, enabled = actionsEnabled) { Text("Restore") }
+                                TextButton(onClick = { onDelete(snapshot) }, enabled = actionsEnabled) {
+                                    Text("Delete", color = Color(0xFFFCA5A5))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
+}
+
 @Composable
 private fun CreateMachineDialog(onDismiss: () -> Unit, onCreate: (VirtualMachine) -> Unit) {
     var name by remember { mutableStateOf("My first PC") }
-    var memory by remember { mutableStateOf("2048") }
+    var memory by remember { mutableStateOf("512") }
     var cores by remember { mutableStateOf("2") }
-    var disk by remember { mutableStateOf("16") }
+    var disk by remember { mutableStateOf("8") }
     var architecture by remember { mutableStateOf(GuestArchitecture.AARCH64) }
     var error by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create virtual machine") },
+        title = { Text("QuickStart • Create VM") },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedTextField(value = name, onValueChange = { name = it; error = null }, label = { Text("Machine name") }, singleLine = true)
-                Text("Guest architecture", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                Text("Quick setup", color = Color(0xFF9AA8B5), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TextButton(onClick = {
+                        memory = "512"
+                        cores = "1"
+                        disk = "8"
+                    }) { Text("Lightweight") }
+                    TextButton(onClick = {
+                        memory = "1024"
+                        cores = "2"
+                        disk = "16"
+                    }) { Text("Balanced") }
+                    TextButton(onClick = {
+                        memory = "2048"
+                        cores = "4"
+                        disk = "32"
+                    }) { Text("Custom+") }
+                }
+                Text("Presets are starting points. Actual safe RAM depends on free memory on this device.", color = Color(0xFF94A3B8), fontSize = 10.sp)
+                Text("Guest architecture", color = Color(0xFF9AA8B5), fontSize = 12.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (architecture == GuestArchitecture.AARCH64) {
-                        Button(onClick = { architecture = GuestArchitecture.AARCH64 }) { Text("ARM64") }
-                    } else {
-                        OutlinedButton(onClick = { architecture = GuestArchitecture.AARCH64 }) { Text("ARM64") }
+                    TextButton(onClick = { architecture = GuestArchitecture.AARCH64 }) {
+                        Text(if (architecture == GuestArchitecture.AARCH64) "✓ ARM64" else "ARM64")
                     }
-                    if (architecture == GuestArchitecture.X86_64) {
-                        Button(onClick = { architecture = GuestArchitecture.X86_64 }) { Text("x86_64") }
-                    } else {
-                        OutlinedButton(onClick = { architecture = GuestArchitecture.X86_64 }) { Text("x86_64") }
+                    TextButton(onClick = { architecture = GuestArchitecture.X86_64 }) {
+                        Text(if (architecture == GuestArchitecture.X86_64) "✓ x86_64 PC" else "x86_64 PC")
                     }
                 }
                 NumberField("Memory (MiB)", memory, { memory = it; error = null })
                 NumberField("CPU cores", cores, { cores = it; error = null })
                 NumberField("Virtual disk (GiB)", disk, { disk = it; error = null })
                 error?.let { Text(it, color = Color(0xFFFCA5A5), fontSize = 12.sp) }
-                Text("QEMU currently runs ARM64 guests using software emulation. x86_64 profiles are saved but cannot boot in this build.", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                Text("QEMU uses software emulation. VM startup needs enough free Android RAM.", color = Color(0xFF9AA8B5), fontSize = 11.sp)
             }
         },
         confirmButton = {

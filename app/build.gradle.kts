@@ -12,8 +12,9 @@ android {
         applicationId = "dev.atdev.qorvex"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.4.0-dev"
+        // CI can stamp preview tags without committing a new Gradle version for each release.
+        versionCode = providers.gradleProperty("qorvexVersionCode").orElse("1").get().toInt()
+        versionName = providers.gradleProperty("qorvexVersionName").orElse("0.4.0-dev").get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a") }
     }

@@ -1,14 +1,15 @@
-name: Android + QEMU ARM64
+name: Android + QEMU ARM64 host / ARM64 + x86_64 guests
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'fdroid/preparation-five-developments']
+    tags: ['v*']
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: qorvex-android-${{ github.ref }}
@@ -23,17 +24,28 @@ jobs:
       - name: Checkout QORVEX
         uses: actions/checkout@v4
 
+      # QEMU and AAVMF are pinned source builds. Cache their verified outputs
+      # so ordinary Kotlin/UI changes do not rebuild the native toolchain.
+      - name: Restore QEMU runtime cache
+        id: qemu-cache
+        uses: actions/cache@v4
+        with:
+          path: out/qemu-runtime
+          key: qorvex-qemu-runtime-v2-${{ runner.os }}-${{ hashFiles('tools/build-qemu-android.sh', 'tools/build-aavmf-from-source.sh') }}
+
       - name: Install EDK II firmware build dependencies
+        if: steps.qemu-cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            acpica-tools nasm uuid-dev python3-venv \
+            acpica-tools nasm uuid-dev python3-venv gcc-aarch64-linux-gnu \
             curl unzip ca-certificates git bzip2 ninja-build meson python3 python3-pip \
             pkg-config flex bison make cmake autoconf automake libtool \
             libglib2.0-dev libglib2.0-bin gettext libintl-perl \
             binutils-aarch64-linux-gnu patchelf
 
       - name: Build QEMU and source-build ARM64 UEFI firmware
+        if: steps.qemu-cache.outputs.cache-hit != 'true'
         run: bash tools/build-qemu-android.sh
 
       - name: Upload Android QEMU runtime
@@ -62,10 +74,13 @@ jobs:
         run: |
           mkdir -p app/src/main/jniLibs/arm64-v8a app/src/main/assets/firmware
           cp out/qemu-runtime/jniLibs/arm64-v8a/*.so app/src/main/jniLibs/arm64-v8a/
+          mkdir -p app/src/main/assets/qemu
+          cp -a out/qemu-runtime/assets/qemu/. app/src/main/assets/qemu/
           cp out/qemu-runtime/assets/firmware/* app/src/main/assets/firmware/
           # GitHub artifact ZIP does not reliably preserve executable mode bits.
-          chmod 755 app/src/main/jniLibs/arm64-v8a/libqemu-system-aarch64.so
+          chmod 755 app/src/main/jniLibs/arm64-v8a/libqemu-system-aarch64.so app/src/main/jniLibs/arm64-v8a/libqemu-system-x86_64.so
           test -s app/src/main/jniLibs/arm64-v8a/libqemu-system-aarch64.so
+          test -s app/src/main/jniLibs/arm64-v8a/libqemu-system-x86_64.so
           test -f app/src/main/jniLibs/arm64-v8a/libslirp.so
           test -f app/src/main/assets/firmware/AAVMF_CODE.fd
           test -f app/src/main/assets/firmware/AAVMF_VARS.fd
@@ -88,15 +103,94 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
-      - name: Run unit tests
-        run: gradle testDebugUnitTest
+      - name: Run unit tests and build APK
+        env:
+          RELEASE_VERSION: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') && github.ref_name || format('0.4.0-dev.{0}', github.run_number) }}
+          RELEASE_CODE: ${{ github.run_number }}
+        run: |
+          VERSION="${RELEASE_VERSION#v}"
+          gradle --no-daemon --parallel --build-cache \
+            -PqorvexVersionName="$VERSION" \
+            -PqorvexVersionCode="$RELEASE_CODE" \
+            testDebugUnitTest assembleDebug
 
-      - name: Build debug APK
-        run: gradle assembleDebug
+      - name: Prepare GitHub Release assets
+        if: github.event_name != 'pull_request'
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            RELEASE_TAG="$GITHUB_REF_NAME"
+          else
+            RELEASE_TAG="continuous-$GITHUB_RUN_NUMBER-$GITHUB_RUN_ATTEMPT"
+          fi
+          mkdir -p release-assets
+          cp app/build/outputs/apk/debug/*.apk "release-assets/QORVEX-$RELEASE_TAG-debug.apk"
+          sha256sum release-assets/*.apk > release-assets/SHA256SUMS.txt
 
-      - name: Upload debug APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: qorvex-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      - name: Upload release assets
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: qorvex-release-assets
+          path: release-assets/*
+          if-no-files-found: error
+
+  publish-github-release:
+    name: Publish GitHub pre-release
+    runs-on: ubuntu-latest
+    needs: android-build
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: write
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: qorvex-release-assets
+          path: release-assets
+
+      - name: Determine release tag
+        id: release
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            RELEASE_TAG="$GITHUB_REF_NAME"
+          else
+            RELEASE_TAG="continuous-$GITHUB_RUN_NUMBER-$GITHUB_RUN_ATTEMPT"
+          fi
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "QORVEX $RELEASE_TAG" \
+              --prerelease \
+              --target "$GITHUB_SHA" \
+              --notes "Automated QORVEX Android preview.
+
+          **Status:** Experimental CI build, not a stable release.
+
+          **Source commit:** $GITHUB_SHA
+          **Workflow run:** $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+
+          **Included:** QEMU ARM64 runtime, ARM64 guest support, experimental x86_64 guest path, virtio networking with NAT/DHCP/DNS, and the current Android interface.
+
+          **Important:** This APK is CI debug-signed. A later build may have a different signing key and require uninstalling the previous preview. Back up VM disk images before uninstalling.
+
+          **Validation:** Physical-device boot, network connectivity, and upgrade compatibility still require testing. Guest operating systems are not included; supply installation media you are licensed to use."
+          fi
+
+          gh release upload "$RELEASE_TAG" release-assets/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber

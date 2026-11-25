@@ -10,6 +10,17 @@ import java.io.File
 import java.nio.file.Files
 
 class QemuCommandBuilderTest {
+    private fun assertDefaultNatNetwork(args: List<String>, expectedNic: String) {
+        assertEquals(1, args.count { it == "-netdev" })
+        assertTrue(args.indexOf("-netdev") < args.indexOf("-device"))
+        assertTrue(args.containsAll(listOf(
+            "-netdev",
+            "user,id=net0,net=10.0.2.0/24,host=10.0.2.2,dhcpstart=10.0.2.15,dns=10.0.2.3,ipv6=off"
+        )))
+        assertTrue(args.containsAll(listOf("-device", expectedNic)))
+        assertFalse(args.any { it.startsWith("tap,") || it.startsWith("bridge,") })
+    }
+
     @Test
     fun buildsArm64CommandWithFirmwareDiskIsoAndSerialConsole() {
         val directory = Files.createTempDirectory("qorvex-qemu-test").toFile()
@@ -39,7 +50,12 @@ class QemuCommandBuilderTest {
         assertTrue(args.any { it.contains(code.absolutePath) })
         assertTrue(args.any { it.contains(vars.absolutePath) })
         assertTrue(args.containsAll(listOf("-serial", "stdio", "-monitor", "none")))
+        assertTrue(args.containsAll(listOf("-display", "none", "-vnc", "127.0.0.1:0")))
+        assertTrue(args.containsAll(listOf("-device", "virtio-gpu-device")))
+        assertTrue(args.containsAll(listOf("-device", "virtio-keyboard-device")))
+        assertTrue(args.containsAll(listOf("-device", "virtio-tablet-device")))
         assertTrue(args.containsAll(listOf("-qmp", "unix:${qmp.absolutePath},server=on,wait=off")))
+        assertDefaultNatNetwork(args, "virtio-net-device,netdev=net0")
         assertFalse(args.any { it == "mon:stdio" })
     }
 
@@ -62,25 +78,37 @@ class QemuCommandBuilderTest {
 
         assertFalse(args.contains("-boot"))
         assertFalse(args.any { it.contains("cdrom") })
+        assertDefaultNatNetwork(args, "virtio-net-device,netdev=net0")
     }
 
-    @Test(expected = IllegalArgumentException::class)
-    fun rejectsUnsupportedX8664Guest() {
+    @Test
+    fun buildsX8664PcCommandWithVirtioNetworkAndNat() {
         val directory = Files.createTempDirectory("qorvex-qemu-x86").toFile()
+        val executable = File(directory, "qemu-system-x86_64").apply { writeText("binary") }
+        val disk = File(directory, "pc-disk.raw").apply { writeText("disk") }
+        val iso = File(directory, "installer.iso").apply { writeText("iso") }
+        val bios = File(directory, "pc-bios").apply { mkdirs() }
         val machine = VirtualMachine(
-            name = "x86 guest",
+            name = "x86 PC",
             architecture = GuestArchitecture.X86_64,
             memoryMiB = 1024,
-            cpuCores = 1,
-            diskSizeGiB = 4
+            cpuCores = 2,
+            diskSizeGiB = 8
         )
-        QemuCommandBuilder.build(
-            File(directory, "qemu"),
-            machine,
-            File(directory, "disk.raw"),
-            null,
-            File(directory, "code.fd"),
-            File(directory, "vars.fd")
-        )
+
+        val args = QemuCommandBuilder.build(executable, machine, disk, iso, File("unused"), File("unused"), qemuDataDirectory = bios)
+
+        assertEquals(executable.absolutePath, args.first())
+        assertTrue(args.containsAll(listOf("-machine", "pc")))
+        assertTrue(args.containsAll(listOf("-accel", "tcg,thread=multi")))
+        assertTrue(args.containsAll(listOf("-cpu", "qemu64")))
+        assertTrue(args.any { it.contains("if=ide,index=0") && it.contains(disk.absolutePath) })
+        assertTrue(args.any { it.contains("media=cdrom") && it.contains(iso.absolutePath) })
+        assertTrue(args.containsAll(listOf("-L", bios.absolutePath)))
+        assertTrue(args.containsAll(listOf("-device", "usb-kbd")))
+        assertTrue(args.containsAll(listOf("-device", "usb-tablet")))
+        assertTrue(args.containsAll(listOf("-display", "none", "-vnc", "127.0.0.1:0")))
+        assertDefaultNatNetwork(args, "virtio-net-pci,netdev=net0")
+        assertFalse(args.any { it.startsWith("e1000,") })
     }
 }

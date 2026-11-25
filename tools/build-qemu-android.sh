@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Native host build of the QORVEX Android ARM64 QEMU runtime. No Docker.
+# Native Android ARM64 host build of QEMU with ARM64 and x86_64 guest targets. No Docker.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="${QORVEX_QEMU_WORKDIR:-${RUNNER_TEMP:-/tmp}/qorvex-qemu-build}"
 PODROID_REPO="https://github.com/ExTV/Podroid.git"
@@ -10,21 +10,29 @@ NDK_VERSION=r27c
 NDK_SHA1=090e8083a715fdb1a3e402d0763c388abb03fb4e
 LIBUCONTEXT_COMMIT=49e671dd52ff6791295d8161ad3b6da7dc5f6f9d
 OUT="$ROOT/out/qemu-runtime"
-PODROID_DIR="$WORK/Podroid"
-SRC="$WORK/sources"
+PODROID_DIR="${QORVEX_PODROID_SOURCE:-$WORK/Podroid}"
+SRC="${QORVEX_SOURCE_ROOT:-$WORK/sources}"
+OFFLINE="${QORVEX_OFFLINE:-0}"
 PREFIX="$WORK/deps"
 NDK_ROOT="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-$WORK/android-ndk-$NDK_VERSION}}"
 JOBS="${QORVEX_BUILD_JOBS:-$(getconf _NPROCESSORS_ONLN)}"
 
-for tool in git curl unzip sha1sum make ninja meson pkg-config flex bison autoconf automake libtoolize gcc g++ patchelf readelf python3; do
+for tool in git unzip sha1sum make ninja meson pkg-config flex bison autoconf automake libtoolize gcc g++ patchelf readelf python3; do
  command -v "$tool" >/dev/null || { echo "Missing build prerequisite: $tool" >&2; exit 1; }
 done
+if [ "$OFFLINE" != "1" ]; then command -v curl >/dev/null || { echo "Missing build prerequisite: curl" >&2; exit 1; }; fi
 mkdir -p "$WORK" "$SRC" "$PREFIX"/{lib,include,lib/pkgconfig} "$OUT/jniLibs/arm64-v8a" "$OUT/assets/firmware"
-if [ ! -d "$PODROID_DIR/.git" ]; then git clone "$PODROID_REPO" "$PODROID_DIR"; fi
-git -C "$PODROID_DIR" fetch --depth 1 origin "$PODROID_COMMIT"
-git -C "$PODROID_DIR" checkout --detach "$PODROID_COMMIT"
+if [ "$OFFLINE" = "1" ]; then
+ [ -d "$PODROID_DIR/.git" ] || { echo "Offline source missing: $PODROID_DIR" >&2; exit 1; }
+ [ "$(git -C "$PODROID_DIR" rev-parse HEAD)" = "$PODROID_COMMIT" ] || { echo "Podroid revision mismatch" >&2; exit 1; }
+else
+ if [ ! -d "$PODROID_DIR/.git" ]; then git clone "$PODROID_REPO" "$PODROID_DIR"; fi
+ git -C "$PODROID_DIR" fetch --depth 1 origin "$PODROID_COMMIT"
+ git -C "$PODROID_DIR" checkout --detach "$PODROID_COMMIT"
+fi
 
 if [ ! -x "$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" ]; then
+ [ "$OFFLINE" != "1" ] || { echo "Offline Android NDK missing or invalid: $NDK_ROOT" >&2; exit 1; }
  archive="$WORK/android-ndk-$NDK_VERSION-linux.zip"
  curl -fL "https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-linux.zip" -o "$archive"
  echo "$NDK_SHA1  $archive" | sha1sum -c -
@@ -67,7 +75,14 @@ endian = 'little'
 EOF
 fetch_tar() {
  local url="$1" archive="$2" dir="$3"
- if [ ! -d "$SRC/$dir" ]; then curl -fL "$url" -o "$SRC/$archive"; tar -xf "$SRC/$archive" -C "$SRC"; rm -f "$SRC/$archive"; fi
+ if [ -d "$SRC/$dir" ]; then return; fi
+ if [ "$OFFLINE" = "1" ]; then
+  echo "Offline source tree missing: $SRC/$dir (expected staged archive: $archive)" >&2
+  exit 1
+ fi
+ curl -fL "$url" -o "$SRC/$archive"
+ tar -xf "$SRC/$archive" -C "$SRC"
+ rm -f "$SRC/$archive"
 }
 
 echo "Building PCRE2 10.44"
@@ -104,9 +119,9 @@ ICONVC
 "$AR" rcs "$PREFIX/lib/libiconv.a" "$WORK/iconv.o"
 cp "$PREFIX/lib/libiconv.a" "$LLVM/sysroot/usr/lib/aarch64-linux-android/26/libiconv.a"
 
-echo "Building GLib 2.82.5"
-fetch_tar https://download.gnome.org/sources/glib/2.82/glib-2.82.5.tar.xz glib.tar.xz glib-2.82.5
-(cd "$SRC/glib-2.82.5" && meson setup _build --cross-file "$WORK/cross.ini" --prefix "$PREFIX" --default-library static -Dselinux=disabled -Dlibmount=disabled && ninja -C _build -j"$JOBS" install)
+echo "Building GLib 2.84.4"
+fetch_tar https://download.gnome.org/sources/glib/2.84/glib-2.84.4.tar.xz glib.tar.xz glib-2.84.4
+(cd "$SRC/glib-2.84.4" && meson setup _build --cross-file "$WORK/cross.ini" --prefix "$PREFIX" --default-library static -Dselinux=disabled -Dlibmount=disabled && ninja -C _build -j"$JOBS" install)
 
 echo "Building Pixman 0.44.2"
 fetch_tar https://cairographics.org/releases/pixman-0.44.2.tar.xz pixman.tar.xz pixman-0.44.2
@@ -118,9 +133,14 @@ fetch_tar https://download.savannah.gnu.org/releases/attr/attr-2.5.2.tar.gz attr
 cp "$PREFIX/lib/libattr.a" "$LLVM/sysroot/usr/lib/aarch64-linux-android/26/libattr.a"
 
 echo "Building libucontext pinned revision"
-if [ ! -d "$SRC/libucontext/.git" ]; then git clone https://github.com/kaniini/libucontext.git "$SRC/libucontext"; fi
-git -C "$SRC/libucontext" fetch --depth 1 origin "$LIBUCONTEXT_COMMIT"
-git -C "$SRC/libucontext" checkout --detach "$LIBUCONTEXT_COMMIT"
+if [ "$OFFLINE" = "1" ]; then
+ [ -d "$SRC/libucontext/.git" ] || { echo "Offline libucontext source missing" >&2; exit 1; }
+ [ "$(git -C "$SRC/libucontext" rev-parse HEAD)" = "$LIBUCONTEXT_COMMIT" ] || { echo "libucontext revision mismatch" >&2; exit 1; }
+else
+ if [ ! -d "$SRC/libucontext/.git" ]; then git clone https://github.com/kaniini/libucontext.git "$SRC/libucontext"; fi
+ git -C "$SRC/libucontext" fetch --depth 1 origin "$LIBUCONTEXT_COMMIT"
+ git -C "$SRC/libucontext" checkout --detach "$LIBUCONTEXT_COMMIT"
+fi
 make -C "$SRC/libucontext" ARCH=aarch64 CC="$CC" EXPORT_UNPREFIXED=yes -j"$JOBS"
 install -Dm644 "$SRC/libucontext/libucontext.a" "$PREFIX/lib/libucontext.a"
 install -Dm644 "$SRC/libucontext/include/libucontext/libucontext.h" "$PREFIX/include/libucontext/libucontext.h"
@@ -233,28 +253,32 @@ grep -q 'LIBUSB_SPEED_UNKNOWN' "$QEMU_DIR/hw/usb/host-libusb.c"
  ./configure --cc="$CC" --cross-prefix="$LLVM/bin/llvm-" \
   --extra-cflags="-fPIC -DANDROID -include $WORK/shm.h -I$PREFIX/include -I$PREFIX/include/glib-2.0 -I$PREFIX/lib/glib-2.0/include" \
   --extra-ldflags="-L$PREFIX/lib -Wl,-z,max-page-size=16384 $PREFIX/lib/libucontext.a $PREFIX/lib/libshm.a $PREFIX/lib/libqemujmp.a" \
-  --prefix="$WORK/qemu-out" --target-list=aarch64-softmmu --enable-tcg --enable-slirp --enable-virtfs --enable-libusb --enable-pie \
-  --disable-docs --disable-gtk --disable-sdl --disable-vnc --disable-vhost-user --disable-plugins --with-coroutine=ucontext
+  --prefix="$WORK/qemu-out" --target-list=aarch64-softmmu,x86_64-softmmu --enable-tcg --enable-slirp --enable-virtfs --enable-libusb --enable-pie \
+  --disable-docs --disable-gtk --disable-sdl --enable-vnc --disable-vhost-user --disable-plugins --with-coroutine=ucontext
  make -j"$JOBS" install
 )
 "$CC" --sysroot="$LLVM/sysroot" -target aarch64-linux-android26 -fPIE -pie -Wl,-z,max-page-size=16384 "$PODROID_DIR/podroid-bridge.c" -o "$WORK/qemu-out/libpodroid-bridge.so"
 "$CC" --sysroot="$LLVM/sysroot" -target aarch64-linux-android26 -fPIE -pie -Wl,-z,max-page-size=16384 "$PODROID_DIR/podroid-launcher.c" -o "$WORK/qemu-out/libpodroid-launcher.so"
 cp "$WORK/qemu-out/bin/qemu-system-aarch64" "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so"
+cp "$WORK/qemu-out/bin/qemu-system-x86_64" "$OUT/jniLibs/arm64-v8a/libqemu-system-x86_64.so"
+mkdir -p "$OUT/assets/qemu"
+if [ -d "$WORK/qemu-out/share/qemu" ]; then cp -a "$WORK/qemu-out/share/qemu/." "$OUT/assets/qemu/"; fi
 cp "$WORK/qemu-out/lib/libslirp.so.0" "$OUT/jniLibs/arm64-v8a/libslirp.so"
 patchelf --set-soname libslirp.so "$OUT/jniLibs/arm64-v8a/libslirp.so"
 patchelf --replace-needed libslirp.so.0 libslirp.so "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so"
+patchelf --replace-needed libslirp.so.0 libslirp.so "$OUT/jniLibs/arm64-v8a/libqemu-system-x86_64.so"
 cp "$WORK/qemu-out/libpodroid-bridge.so" "$OUT/jniLibs/arm64-v8a/"
 cp "$WORK/qemu-out/libpodroid-launcher.so" "$OUT/jniLibs/arm64-v8a/"
-chmod 755 "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so"
+chmod 755 "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so" "$OUT/jniLibs/arm64-v8a/libqemu-system-x86_64.so"
 bash "$ROOT/tools/build-aavmf-from-source.sh"
 
-python3 - "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so" "$OUT/jniLibs/arm64-v8a/libslirp.so" <<'PY'
+python3 - "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so" "$OUT/jniLibs/arm64-v8a/libqemu-system-x86_64.so" "$OUT/jniLibs/arm64-v8a/libslirp.so" <<'PY'
 import struct,sys
 for path in sys.argv[1:]:
  d=open(path,"rb").read()
  if d[:4]!=b"\x7fELF" or d[4]!=2 or d[5]!=1: raise SystemExit(f"{path}: invalid ELF64")
  if struct.unpack_from("<H",d,18)[0]!=183: raise SystemExit(f"{path}: not AArch64")
- if path.endswith("libqemu-system-aarch64.so") and struct.unpack_from("<H",d,16)[0]!=3: raise SystemExit("QEMU must be ET_DYN")
+ if path.endswith(("libqemu-system-aarch64.so","libqemu-system-x86_64.so")) and struct.unpack_from("<H",d,16)[0]!=3: raise SystemExit("QEMU must be ET_DYN")
  po=struct.unpack_from("<Q",d,32)[0]; es=struct.unpack_from("<H",d,54)[0]; n=struct.unpack_from("<H",d,56)[0]; aligns=[]; interp=None
  for i in range(n):
   o=po+i*es; t=struct.unpack_from("<I",d,o)[0]
@@ -262,10 +286,10 @@ for path in sys.argv[1:]:
   elif t==3:
    a=struct.unpack_from("<Q",d,o+8)[0]; z=struct.unpack_from("<Q",d,o+32)[0]; interp=d[a:a+z].rstrip(b"\0").decode()
  if not aligns or any(a<16384 for a in aligns): raise SystemExit(f"{path}: bad 16 KiB alignment {aligns}")
- if path.endswith("libqemu-system-aarch64.so") and interp!="/system/bin/linker64": raise SystemExit(f"wrong interpreter: {interp}")
+ if path.endswith(("libqemu-system-aarch64.so","libqemu-system-x86_64.so")) and interp!="/system/bin/linker64": raise SystemExit(f"wrong interpreter: {interp}")
  print("Verified",path,"AArch64 16 KiB")
 PY
-for f in "$OUT/jniLibs/arm64-v8a/libslirp.so" "$OUT/jniLibs/arm64-v8a/libpodroid-bridge.so" "$OUT/jniLibs/arm64-v8a/libpodroid-launcher.so" "$OUT/assets/firmware/AAVMF_CODE.fd" "$OUT/assets/firmware/AAVMF_VARS.fd"; do
+for f in "$OUT/jniLibs/arm64-v8a/libqemu-system-x86_64.so" "$OUT/jniLibs/arm64-v8a/libslirp.so" "$OUT/jniLibs/arm64-v8a/libpodroid-bridge.so" "$OUT/jniLibs/arm64-v8a/libpodroid-launcher.so" "$OUT/assets/firmware/AAVMF_CODE.fd" "$OUT/assets/firmware/AAVMF_VARS.fd"; do
  test -s "$f" || { echo "Missing output $f" >&2; exit 1; }
 done
 echo "Docker-free QEMU runtime artifacts ready: $OUT"

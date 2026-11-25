@@ -1,13 +1,16 @@
 package dev.atdev.qorvex.runtime
 
+import dev.atdev.qorvex.vm.GuestArchitecture
 import dev.atdev.qorvex.vm.VirtualMachine
 import java.io.File
 
-/**
- * Builds an argument vector for the Android ARM64 QEMU system emulator.
- * No shell is involved, so paths and VM names are passed as individual arguments.
- */
+/** Builds a safe argument vector for the Android ARM64-hosted QEMU system emulators. */
 object QemuCommandBuilder {
+    // QEMU SLIRP user networking provides NAT, DHCP and a DNS proxy without
+    // requiring root, Android network bridging, or a TAP device.
+    private const val USER_NETWORK =
+        "user,id=net0,net=10.0.2.0/24,host=10.0.2.2,dhcpstart=10.0.2.15,dns=10.0.2.3,ipv6=off"
+
     fun build(
         executable: File,
         machine: VirtualMachine,
@@ -15,41 +18,65 @@ object QemuCommandBuilder {
         installationMedia: File?,
         firmwareCode: File,
         firmwareVars: File,
-        qmpSocket: File? = null
+        qmpSocket: File? = null,
+        qemuDataDirectory: File? = null
     ): List<String> {
-        require(machine.architecture.qemuTarget == "aarch64") {
-            "This QEMU build currently supports ARM64 guests only."
-        }
         require(disk.isFile) { "The virtual disk does not exist." }
-        require(firmwareCode.isFile) { "ARM64 UEFI firmware code is missing." }
-        require(firmwareVars.isFile) { "The VM's UEFI variables file is missing." }
-
+        if (machine.architecture == GuestArchitecture.AARCH64) {
+            require(firmwareCode.isFile) { "ARM64 UEFI firmware code is missing." }
+            require(firmwareVars.isFile) { "The VM's UEFI variables file is missing." }
+        }
         return buildList {
             add(executable.absolutePath)
             addAll(listOf("-name", machine.name))
-            addAll(listOf("-machine", "virt,gic-version=3"))
             addAll(listOf("-accel", "tcg,thread=multi"))
-            addAll(listOf("-cpu", "max"))
             addAll(listOf("-smp", machine.cpuCores.toString()))
             addAll(listOf("-m", machine.memoryMiB.toString()))
-            addAll(listOf("-drive", "if=pflash,format=raw,readonly=on,file=${firmwareCode.absolutePath}"))
-            addAll(listOf("-drive", "if=pflash,format=raw,file=${firmwareVars.absolutePath}"))
-            addAll(listOf("-drive", "if=none,id=vdisk,format=raw,file=${disk.absolutePath}"))
-            addAll(listOf("-device", "virtio-blk-device,drive=vdisk"))
-            if (installationMedia != null) {
-                require(installationMedia.isFile) { "The imported installation image is missing." }
-                addAll(listOf("-drive", "if=none,id=cdrom,media=cdrom,format=raw,readonly=on,file=${installationMedia.absolutePath}"))
-                addAll(listOf("-device", "virtio-blk-device,drive=cdrom"))
-                addAll(listOf("-boot", "order=d"))
+            // Define the backend before creating a NIC that references net0.
+            addAll(listOf("-netdev", USER_NETWORK))
+
+            when (machine.architecture) {
+                GuestArchitecture.AARCH64 -> {
+                    addAll(listOf("-machine", "virt,gic-version=3"))
+                    addAll(listOf("-cpu", "max"))
+                    addAll(listOf("-drive", "if=pflash,format=raw,readonly=on,file=${firmwareCode.absolutePath}"))
+                    addAll(listOf("-drive", "if=pflash,format=raw,file=${firmwareVars.absolutePath}"))
+                    addAll(listOf("-drive", "if=none,id=vdisk,format=raw,file=${disk.absolutePath}"))
+                    addAll(listOf("-device", "virtio-blk-device,drive=vdisk"))
+                    if (installationMedia != null) {
+                        require(installationMedia.isFile) { "The imported installation image is missing." }
+                        addAll(listOf("-drive", "if=none,id=cdrom,media=cdrom,format=raw,readonly=on,file=${installationMedia.absolutePath}"))
+                        addAll(listOf("-device", "virtio-blk-device,drive=cdrom"))
+                        addAll(listOf("-boot", "order=d"))
+                    }
+                    addAll(listOf("-device", "virtio-net-device,netdev=net0"))
+                    addAll(listOf("-device", "virtio-gpu-device"))
+                    addAll(listOf("-device", "virtio-keyboard-device"))
+                    addAll(listOf("-device", "virtio-tablet-device"))
+                }
+                GuestArchitecture.X86_64 -> {
+                    addAll(listOf("-machine", "pc"))
+                    addAll(listOf("-cpu", "qemu64"))
+                    if (qemuDataDirectory != null) addAll(listOf("-L", qemuDataDirectory.absolutePath))
+                    addAll(listOf("-drive", "if=ide,index=0,media=disk,format=raw,file=${disk.absolutePath}"))
+                    if (installationMedia != null) {
+                        require(installationMedia.isFile) { "The imported installation image is missing." }
+                        addAll(listOf("-drive", "if=ide,index=1,media=cdrom,readonly=on,format=raw,file=${installationMedia.absolutePath}"))
+                        addAll(listOf("-boot", "order=cd"))
+                    }
+                    addAll(listOf("-device", "virtio-net-pci,netdev=net0"))
+                    addAll(listOf("-vga", "std"))
+                    addAll(listOf("-device", "usb-kbd"))
+                    addAll(listOf("-device", "usb-tablet"))
+                }
             }
-            addAll(listOf("-netdev", "user,id=net0"))
-            addAll(listOf("-device", "virtio-net-device,netdev=net0"))
+
+            // QEMU supplies the guest DHCP lease and DNS proxy through SLIRP.
             addAll(listOf("-display", "none"))
+            addAll(listOf("-vnc", "127.0.0.1:0"))
             addAll(listOf("-serial", "stdio"))
             addAll(listOf("-monitor", "none"))
-            if (qmpSocket != null) {
-                addAll(listOf("-qmp", "unix:${qmpSocket.absolutePath},server=on,wait=off"))
-            }
+            if (qmpSocket != null) addAll(listOf("-qmp", "unix:${qmpSocket.absolutePath},server=on,wait=off"))
             add("-no-reboot")
         }
     }
