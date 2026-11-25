@@ -88,6 +88,7 @@ private fun QorvexDashboard() {
     val repository = remember { VirtualMachineRepository(context) }
     val machines = remember { mutableStateListOf<VirtualMachine>().apply { addAll(repository.getAll()) } }
     var showCreateDialog by remember { mutableStateOf(false) }
+    var selectedSection by remember { mutableStateOf("machines") }
     var notice by remember { mutableStateOf<String?>(null) }
     var mediaTargetId by remember { mutableStateOf<String?>(null) }
     val diskManager = remember { VirtualDiskManager(context) }
@@ -134,49 +135,20 @@ private fun QorvexDashboard() {
                             }.onFailure { notice = "ISO copied, but profile metadata could not be saved: ${it.message}" }
                         }
                     }.onFailure { notice = "ISO import failed: ${it.message}" }
+               Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF101820)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("QORVEX", color = Color(0xFF65E6D5), fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                    Text(if (selectedSection == "machines") "Virtual machines" else "Settings", color = Color(0xFF9AA8B5), fontSize = 13.sp)
                 }
+                if (selectedSection == "machines") Button(onClick = { showCreateDialog = true }) { Text("＋ Create") }
             }
-        }
-        mediaTargetId = null
-    }
-
-    Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF101820)) {
-        Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("QORVEX", color = Color(0xFF65E6D5), fontSize = 28.sp, fontWeight = FontWeight.Black)
-                    Text("Virtual machine manager", color = Color(0xFF9AA8B5), fontSize = 12.sp)
-                }
-                Text("0.4.0-dev", color = Color(0xFF94A3B8), fontSize = 12.sp)
-            }
-
             if (activeMachineId != null) VncDisplayPanel()
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Machines", color = Color(0xFFE5EDF2), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                Button(onClick = { showCreateDialog = true }) { Text("＋ New") }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Saved machines", color = Color(0xFF9AA8B5), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                Text("${machines.size}", color = Color(0xFF65E6D5), fontSize = 12.sp)
-            }
-
+            Column(modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (selectedSection == "machines") {
+                    Text("Your machines", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+                    Text("${machines.size} saved", color = Color(0xFF9AA8B5), fontSize = 12.sp)
             if (machines.isEmpty()) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -261,6 +233,9 @@ private fun QorvexDashboard() {
                 }
             }
 
+
+                } else {
+                    Text("Settings", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(12.dp))
             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF111827))) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -290,6 +265,20 @@ private fun QorvexDashboard() {
                 }
             }
             Text("Built by AtDev", color = Color(0xFF64748B), fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+        }
+    }
+
+
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { selectedSection = "machines" }) { Text(if (selectedSection == "machines") "▣  Machines" else "Machines", color = if (selectedSection == "machines") Color(0xFF65E6D5) else Color(0xFF9AA8B5)) }
+                TextButton(onClick = { selectedSection = "settings" }) { Text(if (selectedSection == "settings") "⚙  Settings" else "Settings", color = if (selectedSection == "settings") Color(0xFF65E6D5) else Color(0xFF9AA8B5)) }
+            }
+        }
+    }
+r = Modifier.align(Alignment.CenterHorizontally))
         }
     }
 
