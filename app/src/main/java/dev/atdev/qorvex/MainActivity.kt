@@ -97,6 +97,7 @@ private fun QorvexDashboard() {
     var notice by remember { mutableStateOf<String?>(null) }
     var mediaTargetId by remember { mutableStateOf<String?>(null) }
     var restoreTarget by remember { mutableStateOf<Pair<VirtualMachine, String>?>(null) }
+    var snapshotManagerTarget by remember { mutableStateOf<VirtualMachine?>(null) }
     var snapshotRevision by remember { mutableStateOf(0) }
     val diskManager = remember { VirtualDiskManager(context) }
     val snapshotManager = remember { VirtualDiskSnapshotManager(context) }
@@ -198,6 +199,7 @@ private fun QorvexDashboard() {
                             }
                         },
                         onRestoreSnapshot = { snapshot -> restoreTarget = machine to snapshot.id },
+                        onManageSnapshots = { snapshotManagerTarget = machine },
                         onDeleteSnapshot = { snapshot ->
                             scope.launch {
                                 runCatching { withContext(Dispatchers.IO) { snapshotManager.deleteSnapshot(machine, snapshot.id) } }
@@ -356,6 +358,31 @@ private fun QorvexDashboard() {
             }
         )
     }
+    snapshotManagerTarget?.let { machine ->
+        val snapshots = remember(machine.id, snapshotRevision) {
+            runCatching { snapshotManager.listSnapshots(machine) }.getOrDefault(emptyList())
+        }
+        SnapshotManagerDialog(
+            machine = machine,
+            snapshots = snapshots,
+            actionsEnabled = activeMachineId == null && runtimeState != RuntimeState.STARTING && runtimeState != RuntimeState.STOPPING,
+            onDismiss = { snapshotManagerTarget = null },
+            onRestore = { snapshot ->
+                snapshotManagerTarget = null
+                restoreTarget = machine to snapshot.id
+            },
+            onDelete = { snapshot ->
+                scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) { snapshotManager.deleteSnapshot(machine, snapshot.id) }
+                    }.onSuccess { deleted ->
+                        snapshotRevision++
+                        notice = if (deleted) "Snapshot deleted." else "Could not delete snapshot files."
+                    }.onFailure { notice = "Snapshot deletion failed: ${it.message}" }
+                }
+            }
+        )
+    }
     restoreTarget?.let { (machine, snapshotId) ->
         AlertDialog(
             onDismissRequest = { restoreTarget = null },
@@ -389,6 +416,7 @@ private fun MachineCard(
     snapshotsEnabled: Boolean,
     onCreateSnapshot: () -> Unit,
     onRestoreSnapshot: (VirtualDiskSnapshot) -> Unit,
+    onManageSnapshots: () -> Unit,
     onDeleteSnapshot: (VirtualDiskSnapshot) -> Unit,
     onDelete: () -> Unit,
     isRunning: Boolean,
@@ -433,14 +461,65 @@ private fun MachineCard(
             Text("Snapshots: $snapshotCount", color = Color(0xFF9AA8B5), fontSize = 11.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onCreateSnapshot, enabled = snapshotsEnabled && diskInfo != null) { Text("＋ Snapshot") }
-                OutlinedButton(onClick = { latestSnapshot?.let(onRestoreSnapshot) }, enabled = snapshotsEnabled && latestSnapshot != null) { Text("Restore latest") }
-                OutlinedButton(onClick = { latestSnapshot?.let(onDeleteSnapshot) }, enabled = snapshotsEnabled && latestSnapshot != null) { Text("Delete latest") }
+                OutlinedButton(onClick = onManageSnapshots, enabled = snapshotCount > 0) { Text("Manage snapshots") }
             }
             if (latestSnapshot != null) {
                 Text("Latest: ${latestSnapshot.displayName} • ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(latestSnapshot.createdAtEpochMs))}", color = Color(0xFF718096), fontSize = 10.sp)
             }
         }
     }
+}
+
+
+@Composable
+private fun SnapshotManagerDialog(
+    machine: VirtualMachine,
+    snapshots: List<VirtualDiskSnapshot>,
+    actionsEnabled: Boolean,
+    onDismiss: () -> Unit,
+    onRestore: (VirtualDiskSnapshot) -> Unit,
+    onDelete: (VirtualDiskSnapshot) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Snapshots • ${machine.name}") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (snapshots.isEmpty()) {
+                    Text("No valid snapshots found. Incomplete or damaged snapshot metadata is hidden.", color = Color(0xFF94A3B8))
+                }
+                snapshots.forEach { snapshot ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF24313A)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Text(snapshot.displayName, color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                java.text.DateFormat.getDateTimeInstance().format(java.util.Date(snapshot.createdAtEpochMs)),
+                                color = Color(0xFF94A3B8),
+                                fontSize = 11.sp
+                            )
+                            Text("${formatBytes(snapshot.capacityBytes)} logical disk image", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { onRestore(snapshot) }, enabled = actionsEnabled) { Text("Restore") }
+                                TextButton(onClick = { onDelete(snapshot) }, enabled = actionsEnabled) {
+                                    Text("Delete", color = Color(0xFFFCA5A5))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
 }
 
 @Composable
