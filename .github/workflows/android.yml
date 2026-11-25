@@ -1,4 +1,4 @@
-name: Android + QEMU ARM64
+name: Android + QEMU ARM64 host / ARM64 + x86_64 guests
 
 on:
   push:
@@ -62,10 +62,13 @@ jobs:
         run: |
           mkdir -p app/src/main/jniLibs/arm64-v8a app/src/main/assets/firmware
           cp out/qemu-runtime/jniLibs/arm64-v8a/*.so app/src/main/jniLibs/arm64-v8a/
+          mkdir -p app/src/main/assets/qemu
+          cp -a out/qemu-runtime/assets/qemu/. app/src/main/assets/qemu/
           cp out/qemu-runtime/assets/firmware/* app/src/main/assets/firmware/
           # GitHub artifact ZIP does not reliably preserve executable mode bits.
-          chmod 755 app/src/main/jniLibs/arm64-v8a/libqemu-system-aarch64.so
+          chmod 755 app/src/main/jniLibs/arm64-v8a/libqemu-system-aarch64.so app/src/main/jniLibs/arm64-v8a/libqemu-system-x86_64.so
           test -s app/src/main/jniLibs/arm64-v8a/libqemu-system-aarch64.so
+          test -s app/src/main/jniLibs/arm64-v8a/libqemu-system-x86_64.so
           test -f app/src/main/jniLibs/arm64-v8a/libslirp.so
           test -f app/src/main/assets/firmware/AAVMF_CODE.fd
           test -f app/src/main/assets/firmware/AAVMF_VARS.fd
