@@ -58,6 +58,8 @@ import dev.atdev.qorvex.runtime.RuntimeState
 import dev.atdev.qorvex.storage.InstallationMediaReader
 import dev.atdev.qorvex.storage.InstallationMediaManager
 import dev.atdev.qorvex.storage.VirtualDiskManager
+import dev.atdev.qorvex.storage.VirtualDiskSnapshot
+import dev.atdev.qorvex.storage.VirtualDiskSnapshotManager
 import dev.atdev.qorvex.vm.GuestArchitecture
 import dev.atdev.qorvex.vm.VirtualMachine
 import dev.atdev.qorvex.vm.VirtualMachineRepository
@@ -94,7 +96,10 @@ private fun QorvexDashboard() {
     var selectedSection by remember { mutableStateOf("machines") }
     var notice by remember { mutableStateOf<String?>(null) }
     var mediaTargetId by remember { mutableStateOf<String?>(null) }
+    var restoreTarget by remember { mutableStateOf<Pair<VirtualMachine, String>?>(null) }
+    var snapshotRevision by remember { mutableStateOf(0) }
     val diskManager = remember { VirtualDiskManager(context) }
+    val snapshotManager = remember { VirtualDiskSnapshotManager(context) }
     val mediaManager = remember { InstallationMediaManager(context) }
     val scope = rememberCoroutineScope()
     val runtime = remember { QorvexRuntimeService.getRuntime(context) }
@@ -163,6 +168,10 @@ private fun QorvexDashboard() {
                 }
             } else {
                 machines.forEach { machine ->
+                    val snapshots = remember(machine.id, snapshotRevision) {
+                        runCatching { snapshotManager.listSnapshots(machine) }.getOrDefault(emptyList())
+                    }
+                    val latestSnapshot = snapshots.firstOrNull()
                     val mediaName = mediaManager.inspect(machine)?.let { imported ->
                         "${imported.displayName} • ${formatBytes(imported.sizeBytes)} • SHA-256 recorded"
                     } ?: machine.installationMediaUri?.let { raw ->
@@ -173,6 +182,22 @@ private fun QorvexDashboard() {
                         machine = machine,
                         mediaName = mediaName,
                         diskInfo = runCatching { diskManager.inspect(machine) }.getOrNull(),
+                        snapshotCount = snapshots.size,
+                        latestSnapshot = latestSnapshot,
+                        snapshotsEnabled = activeMachineId == null && runtimeState != RuntimeState.STARTING && runtimeState != RuntimeState.STOPPING,
+                        onCreateSnapshot = {
+                            scope.launch {
+                                runCatching {
+                                    withContext(Dispatchers.IO) {
+                                        snapshotManager.createSnapshot(machine, "Manual snapshot")
+                                    }
+                                }.onSuccess { created ->
+                                    snapshotRevision++
+                                    notice = "Snapshot created: ${created.displayName} • ${formatBytes(created.capacityBytes)} logical capacity."
+                                }.onFailure { notice = "Snapshot failed: ${it.message}" }
+                            }
+                        },
+                        onRestoreSnapshot = { snapshot -> restoreTarget = machine to snapshot.id },
                         onSelectMedia = {
                             mediaTargetId = machine.id
                             mediaPicker.launch(arrayOf("application/x-iso9660-image", "application/octet-stream", "*/*"))
@@ -321,6 +346,27 @@ private fun QorvexDashboard() {
             }
         )
     }
+    restoreTarget?.let { (machine, snapshotId) ->
+        AlertDialog(
+            onDismissRequest = { restoreTarget = null },
+            title = { Text("Restore disk snapshot?") },
+            text = { Text("The current disk contents of ${machine.name} will be replaced by this saved snapshot. The VM must remain stopped. This cannot be undone unless another snapshot exists.") },
+            confirmButton = {
+                Button(onClick = {
+                    restoreTarget = null
+                    scope.launch {
+                        runCatching { withContext(Dispatchers.IO) { snapshotManager.restoreSnapshot(machine, snapshotId) } }
+                            .onSuccess {
+                                snapshotRevision++
+                                notice = "Snapshot restored. The VM disk now contains the selected saved state."
+                            }
+                            .onFailure { notice = "Snapshot restore failed: ${it.message}" }
+                    }
+                }) { Text("Restore disk") }
+            },
+            dismissButton = { TextButton(onClick = { restoreTarget = null }) { Text("Cancel") } }
+        )
+    }
 }
 
 @Composable
@@ -328,6 +374,11 @@ private fun MachineCard(
     machine: VirtualMachine,
     mediaName: String,
     diskInfo: dev.atdev.qorvex.storage.VirtualDiskInfo?,
+    snapshotCount: Int,
+    latestSnapshot: VirtualDiskSnapshot?,
+    snapshotsEnabled: Boolean,
+    onCreateSnapshot: () -> Unit,
+    onRestoreSnapshot: (VirtualDiskSnapshot) -> Unit,
     onDelete: () -> Unit,
     isRunning: Boolean,
     onStart: () -> Unit,
@@ -365,8 +416,16 @@ private fun MachineCard(
                 OutlinedButton(onClick = onSelectMedia, enabled = !isRunning) { Text("Select ISO") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onCreateDisk) { Text(if (diskInfo != null) "Verify disk" else "Create disk") }
-                OutlinedButton(onClick = onDelete, enabled = !isRunning) { Text("Delete profile") }
+                OutlinedButton(onClick = onCreateDisk, enabled = snapshotsEnabled) { Text(if (diskInfo != null) "Verify disk" else "Create disk") }
+                OutlinedButton(onClick = onDelete, enabled = !isRunning && snapshotsEnabled) { Text("Delete profile") }
+            }
+            Text("Snapshots: $snapshotCount", color = Color(0xFF9AA8B5), fontSize = 11.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onCreateSnapshot, enabled = snapshotsEnabled && diskInfo != null) { Text("＋ Snapshot") }
+                OutlinedButton(onClick = { latestSnapshot?.let(onRestoreSnapshot) }, enabled = snapshotsEnabled && latestSnapshot != null) { Text("Restore latest") }
+            }
+            if (latestSnapshot != null) {
+                Text("Latest: ${latestSnapshot.displayName} • ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(latestSnapshot.createdAtEpochMs))}", color = Color(0xFF718096), fontSize = 10.sp)
             }
         }
     }
