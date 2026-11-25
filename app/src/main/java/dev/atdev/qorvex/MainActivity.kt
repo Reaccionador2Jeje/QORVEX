@@ -140,15 +140,13 @@ private fun QorvexDashboard() {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("QORVEX", color = Color(0xFF65E6D5), fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                    Text(if (selectedSection == "machines") "Virtual machines" else "Settings", color = Color(0xFF9AA8B5), fontSize = 13.sp)
+                    Text(if (selectedSection == "machines") "Virtual machines" else "Settings", color = Color(0xFF9AA8B5, fontSize = 13.sp)
                 }
                 if (selectedSection == "machines") Button(onClick = { showCreateDialog = true }) { Text("＋ Create") }
             }
             if (activeMachineId != null) VncDisplayPanel()
             Column(modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (selectedSection == "machines") {
-                    Text("Your machines", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
-                    Text("${machines.size} saved", color = Color(0xFF9AA8B5), fontSize = 12.sp)
             if (machines.isEmpty()) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -236,6 +234,9 @@ private fun QorvexDashboard() {
 
                 } else {
                     Text("Settings", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+
+                } else {
+                    Text("Settings", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(12.dp))
             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF111827))) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -265,9 +266,6 @@ private fun QorvexDashboard() {
                 }
             }
             Text("Built by AtDev", color = Color(0xFF64748B), fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
-        }
-    }
-
 
                 }
                 Spacer(Modifier.height(8.dp))
@@ -278,10 +276,6 @@ private fun QorvexDashboard() {
             }
         }
     }
-r = Modifier.align(Alignment.CenterHorizontally))
-        }
-    }
-
     if (showCreateDialog) {
         CreateMachineDialog(
             onDismiss = { showCreateDialog = false },
