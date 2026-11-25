@@ -2,7 +2,7 @@ name: Android + QEMU ARM64 host / ARM64 + x86_64 guests
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'fdroid/preparation-five-developments']
     tags: ['v*']
   pull_request:
     branches: [main]
@@ -105,7 +105,7 @@ jobs:
 
       - name: Run unit tests and build APK
         env:
-          RELEASE_VERSION: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') && github.ref_name || '0.4.0-dev' }}
+          RELEASE_VERSION: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') && github.ref_name || format('0.4.0-dev.{0}', github.run_number) }}
           RELEASE_CODE: ${{ github.run_number }}
         run: |
           VERSION="${RELEASE_VERSION#v}"
@@ -115,10 +115,15 @@ jobs:
             testDebugUnitTest assembleDebug
 
       - name: Prepare GitHub Release assets
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name != 'pull_request'
         run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            RELEASE_TAG="$GITHUB_REF_NAME"
+          else
+            RELEASE_TAG="continuous-$GITHUB_RUN_NUMBER-$GITHUB_RUN_ATTEMPT"
+          fi
           mkdir -p release-assets
-          cp app/build/outputs/apk/debug/*.apk "release-assets/QORVEX-${GITHUB_REF_NAME}-debug.apk"
+          cp app/build/outputs/apk/debug/*.apk "release-assets/QORVEX-$RELEASE_TAG-debug.apk"
           sha256sum release-assets/*.apk > release-assets/SHA256SUMS.txt
 
       - name: Upload APK artifact
@@ -129,7 +134,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload release assets
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: qorvex-release-assets
@@ -140,7 +145,7 @@ jobs:
     name: Publish GitHub pre-release
     runs-on: ubuntu-latest
     needs: android-build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name != 'pull_request'
     permissions:
       contents: write
     steps:
@@ -150,23 +155,42 @@ jobs:
           name: qorvex-release-assets
           path: release-assets
 
-      - name: Publish pre-release
+      - name: Determine release tag
+        id: release
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            RELEASE_TAG="$GITHUB_REF_NAME"
+          else
+            RELEASE_TAG="continuous-$GITHUB_RUN_NUMBER-$GITHUB_RUN_ATTEMPT"
+          fi
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub pre-release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
-          gh release create "$GITHUB_REF_NAME" release-assets/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "QORVEX $GITHUB_REF_NAME" \
-            --prerelease \
-            --target "$GITHUB_SHA" \
-            --notes "QORVEX Android preview build.
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "QORVEX $RELEASE_TAG" \
+              --prerelease \
+              --target "$GITHUB_SHA" \
+              --notes "Automated QORVEX Android preview.
 
-          **Status:** Experimental preview, not a stable release.
+          **Status:** Experimental CI build, not a stable release.
+
+          **Source commit:** $GITHUB_SHA
+          **Workflow run:** $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
 
           **Included:** QEMU ARM64 runtime, ARM64 guest support, experimental x86_64 guest path, virtio networking with NAT/DHCP/DNS, and the current Android interface.
 
-          **Important:** This APK is a CI debug-signed build. Installing a later preview may require uninstalling the previous preview first. Back up VM disk images before uninstalling.
+          **Important:** This APK is CI debug-signed. A later build may have a different signing key and require uninstalling the previous preview. Back up VM disk images before uninstalling.
 
-          **Validation:** Review the linked Actions run and SHA256SUMS.txt. Physical-device boot, network connectivity, and upgrade compatibility still require testing.
+          **Validation:** Physical-device boot, network connectivity, and upgrade compatibility still require testing. Guest operating systems are not included; supply installation media you are licensed to use."
+          fi
 
-          Guest operating systems are not included. Supply installation media you are licensed to use."
+          gh release upload "$RELEASE_TAG" release-assets/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
