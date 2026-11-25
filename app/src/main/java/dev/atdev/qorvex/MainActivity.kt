@@ -145,7 +145,7 @@ private fun QorvexDashboard() {
                     Text("QORVEX", color = Color(0xFF65E6D5), fontSize = 25.sp, fontWeight = FontWeight.Bold)
                     Text(if (selectedSection == "machines") "Virtual machines" else "Settings", color = Color(0xFF9AA8B5), fontSize = 13.sp)
                 }
-                if (selectedSection == "machines") Button(onClick = { showCreateDialog = true }) { Text("＋ Create") }
+                if (selectedSection == "machines") Button(onClick = { showCreateDialog = true }) { Text("＋ QuickStart") }
             }
             if (activeMachineId != null) VncDisplayPanel()
             Column(modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -383,13 +383,32 @@ private fun CreateMachineDialog(onDismiss: () -> Unit, onCreate: (VirtualMachine
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create virtual machine") },
+        title = { Text("QuickStart • Create VM") },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedTextField(value = name, onValueChange = { name = it; error = null }, label = { Text("Machine name") }, singleLine = true)
+                Text("Quick setup", color = Color(0xFF9AA8B5), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TextButton(onClick = {
+                        memory = "512"
+                        cores = "1"
+                        disk = "8"
+                    }) { Text("Lightweight") }
+                    TextButton(onClick = {
+                        memory = "1024"
+                        cores = "2"
+                        disk = "16"
+                    }) { Text("Balanced") }
+                    TextButton(onClick = {
+                        memory = "2048"
+                        cores = "4"
+                        disk = "32"
+                    }) { Text("Custom+") }
+                }
+                Text("Presets are starting points. Actual safe RAM depends on free memory on this device.", color = Color(0xFF94A3B8), fontSize = 10.sp)
                 Text("Guest architecture", color = Color(0xFF9AA8B5), fontSize = 12.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = { architecture = GuestArchitecture.AARCH64 }) {
