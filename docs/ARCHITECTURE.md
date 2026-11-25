@@ -17,7 +17,7 @@
              v
     libqemu-system-aarch64.so (Android/Bionic executable)
              |
-             +---- libslirp.so
+             +---- libslirp.so (user-mode NAT, DHCP and DNS proxy)
              +---- AAVMF UEFI pflash code + per-VM vars
              +---- app-private RAW disk
              +---- imported installation ISO
@@ -49,7 +49,8 @@ The first runtime launches only ARM64 guests using QEMU's generic `virt` machine
 - read-only AAVMF_CODE pflash plus a per-VM writable AAVMF_VARS copy
 - app-private sparse RAW disk attached through virtio
 - optional ISO attached as a read-only virtio CD-ROM with CD-ROM boot priority
-- SLIRP user networking through virtio-net
+- SLIRP user-mode NAT through virtio-net (ARM64 `virtio-net-device`; x86_64 `virtio-net-pci`)
+- Guest IPv4 network `10.0.2.0/24`, gateway `10.0.2.2`, DHCP pool beginning at `10.0.2.15`, and DNS proxy `10.0.2.3`
 - serial console on stdio; graphical display disabled in this first backend
 - optional QMP Unix-domain socket for monitor commands and graceful shutdown
 
