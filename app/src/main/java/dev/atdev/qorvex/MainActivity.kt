@@ -1,6 +1,9 @@
 package dev.atdev.qorvex
 
 import android.os.Bundle
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -226,6 +229,20 @@ private fun QorvexDashboard() {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(message, color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        TextButton(onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val fullError = buildString {
+                                appendLine("QORVEX error")
+                                appendLine(message)
+                                if (consoleText.isNotBlank()) {
+                                    appendLine()
+                                    appendLine("QEMU console:")
+                                    append(consoleText)
+                                }
+                            }
+                            clipboard.setPrimaryClip(ClipData.newPlainText("QORVEX error", fullError))
+                            notice = "Error copied to clipboard."
+                        }) { Text("Copy error") }
                         TextButton(onClick = { notice = null }) { Text("OK") }
                     }
                 }
