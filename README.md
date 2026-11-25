@@ -8,13 +8,13 @@ It lets you create VM profiles, prepare virtual disks, import installation media
 
 - Create, save, and delete VM profiles.
 - Configure guest memory, CPU cores, and virtual disk capacity.
-- Create sparse RAW disk images in app-private storage.
-- Inspect disk capacity and allocated storage.
+- Create sparse RAW virtual disks in app-private storage.
+- Create, list, restore, and delete offline virtual-disk snapshots. Snapshot creation and restore require the VM to be stopped; snapshots preserve disk contents, not RAM or running-device state.
 - Import ISO images into app-private storage and record SHA-256 metadata.
 - Launch QEMU ARM64 guests using the generic `virt` machine and UEFI firmware.
 - Attach a virtio virtual disk and optional read-only installation ISO.
 - Provide SLIRP user-mode networking.
-- Capture serial output in the in-app console.
+- Capture guest serial output in the in-app console.
 - Serve the guest framebuffer through QEMU VNC bound to `127.0.0.1` only.
 - Display the live framebuffer in the dashboard using a minimal RFB client (Raw 32-bit true-colour encoding).
 - Forward touch taps/drags as virtual pointer events and Android text input as virtual key events.
@@ -24,21 +24,24 @@ It lets you create VM profiles, prepare virtual disks, import installation media
 
 ## Current limitations
 
-- ARM64 guests only. x86_64 profiles cannot boot with the current runtime.
+- ARM64 guests only. The current native runtime is built for ARM64 Android hosts; x86_64 guest emulation is experimental and must not be described as validated until tested on-device.
 - The graphical frontend currently supports QEMU's loopback VNC server, raw framebuffer updates, touch pointer events, and text/Backspace/Enter key events. Advanced RFB encodings, clipboard sync, hardware mouse capture, and display scaling controls remain future work.
-- Audio, pause/resume, snapshots, and interactive QMP management are not implemented.
+- Audio, pause/resume, and interactive QMP management are not implemented.
+- Snapshots are offline disk copies only. They do not capture guest RAM, CPU state, or a live QEMU session. Copying a large virtual disk can take time and requires additional storage.
 - Disk checks validate the container file and its storage properties; they do not inspect or repair the guest filesystem.
 - TCG is software emulation and can be slow, especially on entry-level devices.
 - Guest boot depends on the selected ISO supporting the ARM64 QEMU `virt` machine and UEFI firmware.
 - Physical-device compatibility testing is still required before calling this a stable release.
 
+QORVEX does not bundle guest operating systems. Users must provide installation media they are licensed to use.
+
 ## Build
 
 The Android app uses Kotlin, Jetpack Compose, and Gradle.
 
-The QEMU runtime is built separately for Android/Bionic ARM64 by `tools/build-qemu-android.sh`. VNC support is enabled for the local display bridge; the server binds to loopback only and is not exposed on the LAN. It pins the Podroid QEMU build recipe, builds QEMU 11.1.2 and SLIRP, and checks the resulting ELF architecture and 16 KiB page alignment. UEFI firmware is built separately from the pinned EDK II source revision by `tools/build-aavmf-from-source.sh`; no prebuilt Debian firmware package is copied into the APK.
+The QEMU runtime is built separately for Android/Bionic ARM64 by `tools/build-qemu-android.sh`. UEFI firmware is built separately from the pinned EDK II source revision by `tools/build-aavmf-from-source.sh`. The native scripts expose an explicit offline mode for pre-staged sources, but the complete source/checksum lock and a successful network-isolated F-Droid build are still release blockers.
 
-Requirements for the current build scripts: a Linux x86_64 host, Git, curl, Python 3 with `venv` and `pip`, GCC/G++, Make, Ninja, Meson, Autoconf/Automake/Libtool, NASM, ACPICA (`iasl`), UUID development headers, `patchelf`, and `readelf`. The QEMU runtime build no longer requires Docker.
+Requirements for the current build scripts: a Linux x86_64 host, Git, Python 3 with `venv` and `pip`, GCC/G++, Make, Ninja, Meson, Autoconf/Automake/Libtool, NASM, ACPICA (`iasl`), UUID development headers, `patchelf`, and `readelf`. The QEMU runtime build no longer requires Docker.
 
 ```bash
 bash tools/build-qemu-android.sh
@@ -52,7 +55,7 @@ A plain Gradle build without first producing and packaging the QEMU runtime does
 
 - Android application: Apache-2.0.
 - QEMU 11.1.2: GPL-2.0.
-- Firmware: EDK II/AAVMF, with the Debian package copyright notice.
+- Firmware: EDK II/AAVMF; preserve the upstream license and copyright notices.
 - Native build recipe: ExTV/Podroid at the pinned commit documented in `docs/THIRD-PARTY-LICENSES.md`.
 
 QORVEX does not claim ownership of QEMU, SLIRP, or EDK II. Corresponding source, build patches, and required notices must accompany redistribution of the relevant binaries. See [the third-party license record](docs/THIRD-PARTY-LICENSES.md).
