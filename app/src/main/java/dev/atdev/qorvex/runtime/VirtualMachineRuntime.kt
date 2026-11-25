@@ -68,7 +68,7 @@ sealed interface RuntimeResult {
  */
 class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
     private val appContext = context.applicationContext
-    private val qemuExecutable = File(appContext.applicationInfo.nativeLibraryDir, QEMU_LIBRARY)
+    private fun qemuExecutable(architecture: GuestArchitecture): File = File(appContext.applicationInfo.nativeLibraryDir, if (architecture == GuestArchitecture.X86_64) QEMU_X86_LIBRARY else QEMU_ARM_LIBRARY)
     private val diskManager = VirtualDiskManager(appContext)
     private val sessionJournal = RuntimeSessionJournal(appContext)
     private val mediaManager = InstallationMediaManager(appContext)
@@ -98,7 +98,7 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
                 detail = "This build requires a 64-bit ARM Android device (arm64-v8a)."
             )
         }
-        if (!qemuExecutable.isFile || !qemuExecutable.canExecute()) {
+        if (!qemuExecutable(GuestArchitecture.AARCH64).let { it.isFile && it.canExecute() }) {
             return RuntimeCapabilities(
                 availability = RuntimeAvailability.NOT_INSTALLED,
                 detail = "QEMU ARM64 binary is not packaged in this APK. Build the QEMU runtime artifact first."
@@ -116,9 +116,9 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
         }
         return RuntimeCapabilities(
             availability = RuntimeAvailability.READY,
-            supportedArchitectures = setOf(GuestArchitecture.AARCH64.qemuTarget),
+            supportedArchitectures = buildSet { add(GuestArchitecture.AARCH64.qemuTarget); if (qemuExecutable(GuestArchitecture.X86_64).isFile) add(GuestArchitecture.X86_64.qemuTarget) },
             hardwareAccelerationAvailable = false,
-            detail = "QEMU ARM64 is ready. TCG software emulation and the loopback VNC framebuffer frontend are enabled."
+            detail = "QEMU ARM64 host supports ARM64 and x86_64 guests through TCG software emulation when the x86 binary is packaged."
         )
     }
 
@@ -127,10 +127,8 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
         if (capabilities.availability != RuntimeAvailability.READY) {
             return@withLock RuntimeResult.Failure(capabilities.detail)
         }
-        if (machine.architecture != GuestArchitecture.AARCH64) {
-            return@withLock RuntimeResult.Failure(
-                "This QEMU build supports ARM64 guests only. x86_64 guest support is not included yet."
-            )
+        if (!qemuExecutable(machine.architecture).let { it.isFile && it.canExecute() }) {
+            return@withLock RuntimeResult.Failure("The QEMU binary for ${machine.architecture.qemuTarget} is not packaged.")
         }
         // QEMU TCG allocates guest RAM in the Android process. Avoid asking
         // Android to kill QORVEX by checking available device memory first.
@@ -165,7 +163,7 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
                     error("The imported installation image is missing. Select it again before booting.")
                 }
 
-                val firmware = prepareFirmware(machine)
+                val firmware = if (machine.architecture == GuestArchitecture.AARCH64) prepareFirmware(machine) else File(appContext.filesDir, "unused-x86-firmware") to File(appContext.filesDir, "unused-x86-vars")
                 val qmpSocket = qmpSocketFor(machine.id).apply {
                     parentFile?.let { directory ->
                         check(directory.isDirectory || directory.mkdirs()) {
@@ -178,19 +176,20 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
                     "The QMP socket path is too long for an Android local socket."
                 }
                 val command = QemuCommandBuilder.build(
-                    executable = qemuExecutable,
+                    executable = qemuExecutable(machine.architecture),
                     machine = machine,
                     disk = disk,
                     installationMedia = media,
                     firmwareCode = firmware.first,
                     firmwareVars = firmware.second,
-                    qmpSocket = qmpSocket
+                    qmpSocket = qmpSocket,
+                    qemuDataDirectory = if (machine.architecture == GuestArchitecture.X86_64) prepareQemuDataDirectory() else null
                 )
                 // Persist before spawning QEMU. If Android kills the app process,
                 // the next launch can identify this VM as an interrupted session.
                 sessionJournal.begin(machine.id, diskInfo.capacityBytes)
                 appendConsoleLine(
-                    "Launching QEMU ARM64: ${machine.name}, ${machine.memoryMiB} MiB RAM, " +
+                    "Launching QEMU ${machine.architecture.qemuTarget}: ${machine.name}, ${machine.memoryMiB} MiB RAM, " +
                         "${machine.cpuCores} CPU cores."
                 )
                 val child = ProcessBuilder(command)
@@ -370,7 +369,8 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
     }
 
     private companion object {
-        const val QEMU_LIBRARY = "libqemu-system-aarch64.so"
+        const val QEMU_ARM_LIBRARY = "libqemu-system-aarch64.so"
+        const val QEMU_X86_LIBRARY = "libqemu-system-x86_64.so"
         const val FIRMWARE_CODE_ASSET = "firmware/AAVMF_CODE.fd"
         const val FIRMWARE_VARS_ASSET = "firmware/AAVMF_VARS.fd"
         const val STOP_TIMEOUT_SECONDS = 5L
