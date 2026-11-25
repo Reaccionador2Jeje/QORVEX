@@ -266,9 +266,10 @@ if [ -d "$WORK/qemu-out/share/qemu" ]; then cp -a "$WORK/qemu-out/share/qemu/." 
 cp "$WORK/qemu-out/lib/libslirp.so.0" "$OUT/jniLibs/arm64-v8a/libslirp.so"
 patchelf --set-soname libslirp.so "$OUT/jniLibs/arm64-v8a/libslirp.so"
 patchelf --replace-needed libslirp.so.0 libslirp.so "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so"
+patchelf --replace-needed libslirp.so.0 libslirp.so "$OUT/jniLibs/arm64-v8a/libqemu-system-x86_64.so"
 cp "$WORK/qemu-out/libpodroid-bridge.so" "$OUT/jniLibs/arm64-v8a/"
 cp "$WORK/qemu-out/libpodroid-launcher.so" "$OUT/jniLibs/arm64-v8a/"
-chmod 755 "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so"
+chmod 755 "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so" "$OUT/jniLibs/arm64-v8a/libqemu-system-x86_64.so"
 bash "$ROOT/tools/build-aavmf-from-source.sh"
 
 python3 - "$OUT/jniLibs/arm64-v8a/libqemu-system-aarch64.so" "$OUT/jniLibs/arm64-v8a/libqemu-system-x86_64.so" "$OUT/jniLibs/arm64-v8a/libslirp.so" <<'PY'
