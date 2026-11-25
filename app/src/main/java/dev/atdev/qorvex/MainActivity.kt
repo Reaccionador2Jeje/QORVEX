@@ -146,7 +146,11 @@ private fun QorvexDashboard() {
                             }.onFailure { notice = "ISO copied, but profile metadata could not be saved: ${it.message}" }
                         }
                     }.onFailure { notice = "ISO import failed: ${it.message}" }
-               Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF101820)) {
+                }
+            }
+        }
+    }
+    Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF101820)) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
