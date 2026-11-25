@@ -6,6 +6,11 @@ import java.io.File
 
 /** Builds a safe argument vector for the Android ARM64-hosted QEMU system emulators. */
 object QemuCommandBuilder {
+    // QEMU SLIRP user networking provides NAT, DHCP and a DNS proxy without
+    // requiring root, Android network bridging, or a TAP device.
+    private const val USER_NETWORK =
+        "user,id=net0,net=10.0.2.0/24,host=10.0.2.2,dhcpstart=10.0.2.15,dns=10.0.2.3,ipv6=off"
+
     fun build(
         executable: File,
         machine: VirtualMachine,
@@ -42,7 +47,6 @@ object QemuCommandBuilder {
                         addAll(listOf("-device", "virtio-blk-device,drive=cdrom"))
                         addAll(listOf("-boot", "order=d"))
                     }
-                    addAll(listOf("-netdev", "user,id=net0"))
                     addAll(listOf("-device", "virtio-net-device,netdev=net0"))
                     addAll(listOf("-device", "virtio-gpu-device"))
                     addAll(listOf("-device", "virtio-keyboard-device"))
@@ -58,14 +62,16 @@ object QemuCommandBuilder {
                         addAll(listOf("-drive", "if=ide,index=1,media=cdrom,readonly=on,format=raw,file=${installationMedia.absolutePath}"))
                         addAll(listOf("-boot", "order=cd"))
                     }
-                    addAll(listOf("-netdev", "user,id=net0"))
-                    addAll(listOf("-device", "e1000,netdev=net0"))
+                    addAll(listOf("-device", "virtio-net-pci,netdev=net0"))
                     addAll(listOf("-vga", "std"))
                     addAll(listOf("-device", "usb-kbd"))
                     addAll(listOf("-device", "usb-tablet"))
                 }
             }
 
+            // Attach the same SLIRP NAT backend to the architecture-specific
+            // virtio NIC. QEMU supplies the guest DHCP lease and DNS proxy.
+            addAll(listOf("-netdev", USER_NETWORK))
             addAll(listOf("-display", "none"))
             addAll(listOf("-vnc", "127.0.0.1:0"))
             addAll(listOf("-serial", "stdio"))
