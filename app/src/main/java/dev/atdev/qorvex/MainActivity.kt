@@ -98,6 +98,8 @@ private fun QorvexDashboard() {
     var mediaTargetId by remember { mutableStateOf<String?>(null) }
     var restoreTarget by remember { mutableStateOf<Pair<VirtualMachine, String>?>(null) }
     var snapshotManagerTarget by remember { mutableStateOf<VirtualMachine?>(null) }
+    var snapshotNameTarget by remember { mutableStateOf<VirtualMachine?>(null) }
+    var snapshotName by remember { mutableStateOf("Before changes") }
     var snapshotRevision by remember { mutableStateOf(0) }
     val diskManager = remember { VirtualDiskManager(context) }
     val snapshotManager = remember { VirtualDiskSnapshotManager(context) }
@@ -187,16 +189,8 @@ private fun QorvexDashboard() {
                         latestSnapshot = latestSnapshot,
                         snapshotsEnabled = activeMachineId == null && runtimeState != RuntimeState.STARTING && runtimeState != RuntimeState.STOPPING,
                         onCreateSnapshot = {
-                            scope.launch {
-                                runCatching {
-                                    withContext(Dispatchers.IO) {
-                                        snapshotManager.createSnapshot(machine, "Manual snapshot")
-                                    }
-                                }.onSuccess { created ->
-                                    snapshotRevision++
-                                    notice = "Snapshot created: ${created.displayName} • ${formatBytes(created.capacityBytes)} logical capacity."
-                                }.onFailure { notice = "Snapshot failed: ${it.message}" }
-                            }
+                            snapshotName = "Before changes"
+                            snapshotNameTarget = machine
                         },
                         onManageSnapshots = { snapshotManagerTarget = machine },
                         onSelectMedia = {
@@ -344,6 +338,48 @@ private fun QorvexDashboard() {
                 machines.add(machine)
                 showCreateDialog = false
                 notice = "${machine.name} profile created and saved on this device."
+            }
+        )
+    }
+    snapshotNameTarget?.let { machine ->
+        AlertDialog(
+            onDismissRequest = { snapshotNameTarget = null },
+            title = { Text("Create disk snapshot") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("The VM must be stopped. This creates a separate disk copy and may use additional storage.", color = Color(0xFF94A3B8))
+                    OutlinedTextField(
+                        value = snapshotName,
+                        onValueChange = { snapshotName = it.take(64) },
+                        label = { Text("Snapshot name") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val name = snapshotName.trim()
+                        if (name.isNotEmpty()) {
+                            snapshotNameTarget = null
+                            scope.launch {
+                                runCatching {
+                                    withContext(Dispatchers.IO) {
+                                        snapshotManager.createSnapshot(machine, name)
+                                    }
+                                }.onSuccess { created ->
+                                    snapshotRevision++
+                                    notice = "Snapshot created: ${created.displayName} • ${formatBytes(created.capacityBytes)} logical capacity."
+                                }.onFailure { notice = "Snapshot failed: ${it.message}" }
+                            }
+                        }
+                    },
+                    enabled = snapshotName.isNotBlank() && activeMachineId == null &&
+                        runtimeState != RuntimeState.STARTING && runtimeState != RuntimeState.STOPPING
+                ) { Text("Create snapshot") }
+            },
+            dismissButton = {
+                TextButton(onClick = { snapshotNameTarget = null }) { Text("Cancel") }
             }
         )
     }
