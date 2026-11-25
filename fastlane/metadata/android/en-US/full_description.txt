@@ -7,14 +7,15 @@ FEATURES
 • Import installation ISO images
 • Run ARM64 guest systems with QEMU TCG software emulation
 • Use UEFI firmware, virtio storage, and SLIRP user-mode networking
-• View guest serial output in the app
+• View guest serial output and a live graphical framebuffer
+• Send touch pointer events and text input to the guest
 • Keep a running VM active with an Android foreground service
 • Request graceful VM shutdown from the app or its notification
 • Detect interrupted sessions and check virtual-disk container properties before restarting
 
 LIMITATIONS
 • ARM64 guests only
-• Serial console only; graphical display and touch input are not yet available
+• The graphical frontend supports basic framebuffer updates and touch/text input; advanced display and input features remain limited
 • Software emulation can be slow on lower-powered devices
 • Disk checks do not verify or repair the guest operating system's filesystem
 • Guest operating-system compatibility depends on the ISO and QEMU's ARM64 virt machine
