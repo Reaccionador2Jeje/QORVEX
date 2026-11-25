@@ -198,6 +198,16 @@ private fun QorvexDashboard() {
                             }
                         },
                         onRestoreSnapshot = { snapshot -> restoreTarget = machine to snapshot.id },
+                        onDeleteSnapshot = { snapshot ->
+                            scope.launch {
+                                runCatching { withContext(Dispatchers.IO) { snapshotManager.deleteSnapshot(machine, snapshot.id) } }
+                                    .onSuccess { deleted ->
+                                        snapshotRevision++
+                                        notice = if (deleted) "Snapshot deleted." else "Could not delete the snapshot files."
+                                    }
+                                    .onFailure { notice = "Snapshot deletion failed: ${it.message}" }
+                            }
+                        },
                         onSelectMedia = {
                             mediaTargetId = machine.id
                             mediaPicker.launch(arrayOf("application/x-iso9660-image", "application/octet-stream", "*/*"))
@@ -379,6 +389,7 @@ private fun MachineCard(
     snapshotsEnabled: Boolean,
     onCreateSnapshot: () -> Unit,
     onRestoreSnapshot: (VirtualDiskSnapshot) -> Unit,
+    onDeleteSnapshot: (VirtualDiskSnapshot) -> Unit,
     onDelete: () -> Unit,
     isRunning: Boolean,
     onStart: () -> Unit,
@@ -423,6 +434,7 @@ private fun MachineCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onCreateSnapshot, enabled = snapshotsEnabled && diskInfo != null) { Text("＋ Snapshot") }
                 OutlinedButton(onClick = { latestSnapshot?.let(onRestoreSnapshot) }, enabled = snapshotsEnabled && latestSnapshot != null) { Text("Restore latest") }
+                OutlinedButton(onClick = { latestSnapshot?.let(onDeleteSnapshot) }, enabled = snapshotsEnabled && latestSnapshot != null) { Text("Delete latest") }
             }
             if (latestSnapshot != null) {
                 Text("Latest: ${latestSnapshot.displayName} • ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(latestSnapshot.createdAtEpochMs))}", color = Color(0xFF718096), fontSize = 10.sp)
