@@ -3,12 +3,13 @@ name: Android + QEMU ARM64 host / ARM64 + x86_64 guests
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: qorvex-android-${{ github.ref }}
@@ -102,12 +103,70 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
-      - name: Run unit tests and build debug APK
-        run: gradle --no-daemon --parallel --build-cache testDebugUnitTest assembleDebug
+      - name: Run unit tests and build APK
+        env:
+          RELEASE_VERSION: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') && github.ref_name || '0.4.0-dev' }}
+          RELEASE_CODE: ${{ github.run_number }}
+        run: |
+          VERSION="${RELEASE_VERSION#v}"
+          gradle --no-daemon --parallel --build-cache \
+            -PqorvexVersionName="$VERSION" \
+            -PqorvexVersionCode="$RELEASE_CODE" \
+            testDebugUnitTest assembleDebug
 
-      - name: Upload debug APK
+      - name: Prepare GitHub Release assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mkdir -p release-assets
+          cp app/build/outputs/apk/debug/*.apk "release-assets/QORVEX-${GITHUB_REF_NAME}-debug.apk"
+          sha256sum release-assets/*.apk > release-assets/SHA256SUMS.txt
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: qorvex-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      - name: Upload release assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: qorvex-release-assets
+          path: release-assets/*
+          if-no-files-found: error
+
+  publish-github-release:
+    name: Publish GitHub pre-release
+    runs-on: ubuntu-latest
+    needs: android-build
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: qorvex-release-assets
+          path: release-assets
+
+      - name: Publish pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release-assets/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "QORVEX $GITHUB_REF_NAME" \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --notes "QORVEX Android preview build.
+
+          **Status:** Experimental preview, not a stable release.
+
+          **Included:** QEMU ARM64 runtime, ARM64 guest support, experimental x86_64 guest path, virtio networking with NAT/DHCP/DNS, and the current Android interface.
+
+          **Important:** This APK is a CI debug-signed build. Installing a later preview may require uninstalling the previous preview first. Back up VM disk images before uninstalling.
+
+          **Validation:** Review the linked Actions run and SHA256SUMS.txt. Physical-device boot, network connectivity, and upgrade compatibility still require testing.
+
+          Guest operating systems are not included. Supply installation media you are licensed to use."
