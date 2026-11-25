@@ -234,9 +234,6 @@ private fun QorvexDashboard() {
 
                 } else {
                     Text("Settings", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-
-                } else {
-                    Text("Settings", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(12.dp))
             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF111827))) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
