@@ -26,10 +26,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.awaitPointerEvent
-import androidx.compose.ui.input.pointer.awaitPointerEventScope
+import androidx.compose.ui.input.pointer.detectTapGestures
+import androidx.compose.ui.input.pointer.detectDragGestures
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import dev.atdev.qorvex.runtime.VncDisplayClient
@@ -81,24 +80,31 @@ internal fun VncDisplayPanel() {
                         .height(260.dp)
                         .background(Color.Black)
                         .pointerInput(client, currentBitmap) {
-                            // Keep one pointer event loop so taps, drags, and mouse hover
-                            // don't compete with separate gesture detectors.
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    val change = event.changes.firstOrNull() ?: continue
-                                    val x = (change.position.x / size.width * client.framebufferWidth).toInt()
-                                    val y = (change.position.y / size.height * client.framebufferHeight).toInt()
-
-                                    // RFB button mask: left=1, middle=2, right=4.
-                                    // Compose's primary/tertiary/secondary map to left/middle/right.
-                                    val buttons =
-                                        (if (event.buttons.isPrimaryPressed) 1 else 0) or
-                                        (if (event.buttons.isTertiaryPressed) 2 else 0) or
-                                        (if (event.buttons.isSecondaryPressed) 4 else 0)
-                                    client.sendPointer(x, y, buttons)
-                                }
+                            detectTapGestures { position ->
+                                val x = (position.x / size.width * client.framebufferWidth).toInt()
+                                val y = (position.y / size.height * client.framebufferHeight).toInt()
+                                client.sendPointer(x, y, 1)
+                                client.sendPointer(x, y, 0)
                             }
+                        }
+                        .pointerInput(client, currentBitmap) {
+                            var lastX = 0
+                            var lastY = 0
+                            detectDragGestures(
+                                onDragStart = { position ->
+                                    lastX = (position.x / size.width * client.framebufferWidth).toInt()
+                                    lastY = (position.y / size.height * client.framebufferHeight).toInt()
+                                    client.sendPointer(lastX, lastY, 1)
+                                },
+                                onDrag = { change, _ ->
+                                    lastX = (change.position.x / size.width * client.framebufferWidth).toInt()
+                                    lastY = (change.position.y / size.height * client.framebufferHeight).toInt()
+                                    client.sendPointer(lastX, lastY, 1)
+                                    change.consume()
+                                },
+                                onDragEnd = { client.sendPointer(lastX, lastY, 0) },
+                                onDragCancel = { client.sendPointer(lastX, lastY, 0) }
+                            )
                         }
                 )
             } else {
