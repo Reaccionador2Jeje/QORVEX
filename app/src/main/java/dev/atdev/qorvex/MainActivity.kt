@@ -361,7 +361,7 @@ private fun CreateMachineDialog(onDismiss: () -> Unit, onCreate: (VirtualMachine
     var memory by remember { mutableStateOf("512") }
     var cores by remember { mutableStateOf("2") }
     var disk by remember { mutableStateOf("8") }
-    val architecture = GuestArchitecture.AARCH64
+    var architecture by remember { mutableStateOf(GuestArchitecture.AARCH64) }
     var error by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
@@ -374,7 +374,14 @@ private fun CreateMachineDialog(onDismiss: () -> Unit, onCreate: (VirtualMachine
             ) {
                 OutlinedTextField(value = name, onValueChange = { name = it; error = null }, label = { Text("Machine name") }, singleLine = true)
                 Text("Guest architecture", color = Color(0xFF9AA8B5), fontSize = 12.sp)
-                Text("ARM64 (AArch64)", color = Color(0xFFE5EDF2), fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { architecture = GuestArchitecture.AARCH64 }) {
+                        Text(if (architecture == GuestArchitecture.AARCH64) "✓ ARM64" else "ARM64")
+                    }
+                    TextButton(onClick = { architecture = GuestArchitecture.X86_64 }) {
+                        Text(if (architecture == GuestArchitecture.X86_64) "✓ x86_64 PC" else "x86_64 PC")
+                    }
+                }
                 NumberField("Memory (MiB)", memory, { memory = it; error = null })
                 NumberField("CPU cores", cores, { cores = it; error = null })
                 NumberField("Virtual disk (GiB)", disk, { disk = it; error = null })
