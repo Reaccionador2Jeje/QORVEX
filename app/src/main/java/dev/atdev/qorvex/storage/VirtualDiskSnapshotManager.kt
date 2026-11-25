@@ -118,7 +118,11 @@ class VirtualDiskSnapshotManager(context: Context) {
         }
         try {
             copySparse(snapshot.file, staged)
-            check(staged.length() == target.length()) { "Restored disk capacity verification failed." }
+            val expectedCapacity = machine.diskSizeGiB.toLong() * GIB
+            check(staged.length() == expectedCapacity) { "Restored disk capacity verification failed." }
+            if (target.exists()) require(target.length() == expectedCapacity) {
+                "Current disk capacity does not match the VM profile; restore was not applied."
+            }
             if (target.exists()) {
                 check(target.renameTo(backup)) { "Could not preserve the current disk for rollback." }
             }
@@ -146,8 +150,6 @@ class VirtualDiskSnapshotManager(context: Context) {
     }
 
     private fun machineDirectory(machine: VirtualMachine): File {
-        val key = machine.id.toByteArray(Charsets.UTF_8).joinToString("") { "%02x".format(it) }
-            .take(96)
         // Hashing avoids path traversal and keeps the directory name independent of profile text.
         val digest = java.security.MessageDigest.getInstance("SHA-256")
             .digest(machine.id.toByteArray(Charsets.UTF_8))
