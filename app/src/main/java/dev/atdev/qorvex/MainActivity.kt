@@ -198,18 +198,7 @@ private fun QorvexDashboard() {
                                 }.onFailure { notice = "Snapshot failed: ${it.message}" }
                             }
                         },
-                        onRestoreSnapshot = { snapshot -> restoreTarget = machine to snapshot.id },
                         onManageSnapshots = { snapshotManagerTarget = machine },
-                        onDeleteSnapshot = { snapshot ->
-                            scope.launch {
-                                runCatching { withContext(Dispatchers.IO) { snapshotManager.deleteSnapshot(machine, snapshot.id) } }
-                                    .onSuccess { deleted ->
-                                        snapshotRevision++
-                                        notice = if (deleted) "Snapshot deleted." else "Could not delete the snapshot files."
-                                    }
-                                    .onFailure { notice = "Snapshot deletion failed: ${it.message}" }
-                            }
-                        },
                         onSelectMedia = {
                             mediaTargetId = machine.id
                             mediaPicker.launch(arrayOf("application/x-iso9660-image", "application/octet-stream", "*/*"))
@@ -415,9 +404,7 @@ private fun MachineCard(
     latestSnapshot: VirtualDiskSnapshot?,
     snapshotsEnabled: Boolean,
     onCreateSnapshot: () -> Unit,
-    onRestoreSnapshot: (VirtualDiskSnapshot) -> Unit,
     onManageSnapshots: () -> Unit,
-    onDeleteSnapshot: (VirtualDiskSnapshot) -> Unit,
     onDelete: () -> Unit,
     isRunning: Boolean,
     onStart: () -> Unit,
