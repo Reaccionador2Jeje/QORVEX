@@ -4,6 +4,7 @@ FEATURES
 • Create and manage virtual-machine profiles
 • Configure guest memory, CPU cores, and virtual disk capacity
 • Create sparse virtual disks in private app storage
+• Create, restore, and delete offline virtual-disk snapshots while the VM is stopped
 • Import installation ISO images
 • Run ARM64 guest systems with QEMU TCG software emulation
 • Use UEFI firmware, virtio storage, and SLIRP user-mode networking
@@ -15,6 +16,7 @@ FEATURES
 
 LIMITATIONS
 • ARM64 guests only
+• Snapshots preserve virtual-disk contents only, not RAM or running VM state
 • The graphical frontend supports basic framebuffer updates and touch/text input; advanced display and input features remain limited
 • Software emulation can be slow on lower-powered devices
 • Disk checks do not verify or repair the guest operating system's filesystem
