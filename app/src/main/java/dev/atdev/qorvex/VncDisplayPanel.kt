@@ -135,6 +135,24 @@ internal fun VncDisplayPanel() {
                 Button(onClick = { sendKeyTap(client, KEY_BACKSPACE) }) { Text("Backspace") }
                 Button(onClick = { sendKeyTap(client, KEY_TAB) }) { Text("Tab") }
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { sendKeyTap(client, KEY_ESCAPE) }) { Text("Esc") }
+                Button(onClick = { sendKeyTap(client, KEY_UP) }) { Text("↑") }
+                Button(onClick = { sendKeyTap(client, KEY_DOWN) }) { Text("↓") }
+                Button(onClick = { sendKeyTap(client, KEY_LEFT) }) { Text("←") }
+                Button(onClick = { sendKeyTap(client, KEY_RIGHT) }) { Text("→") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {
+                    // Send the Windows secure-attention key chord as a single ordered sequence.
+                    client.sendKey(KEY_CTRL_LEFT, true)
+                    client.sendKey(KEY_ALT_LEFT, true)
+                    client.sendKey(KEY_DELETE, true)
+                    client.sendKey(KEY_DELETE, false)
+                    client.sendKey(KEY_ALT_LEFT, false)
+                    client.sendKey(KEY_CTRL_LEFT, false)
+                }) { Text("Ctrl + Alt + Del") }
+            }
             Text(
                 "Touch/mouse move = guest pointer • Touch press = click • Hold and move = drag",
                 color = Color(0xFF718096)
@@ -154,3 +172,11 @@ private fun unicodeToKeysym(codePoint: Int): Int =
 private const val KEY_BACKSPACE = 0xff08
 private const val KEY_TAB = 0xff09
 private const val KEY_ENTER = 0xff0d
+private const val KEY_ESCAPE = 0xff1b
+private const val KEY_UP = 0xff52
+private const val KEY_DOWN = 0xff54
+private const val KEY_LEFT = 0xff51
+private const val KEY_RIGHT = 0xff53
+private const val KEY_CTRL_LEFT = 0xffe3
+private const val KEY_ALT_LEFT = 0xffe9
+private const val KEY_DELETE = 0xffff
