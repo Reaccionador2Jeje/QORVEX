@@ -276,6 +276,26 @@ private fun QorvexDashboard() {
                             lineHeight = 14.sp,
                             maxLines = 18
                         )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    val report = buildString {
+                                        appendLine("QORVEX diagnostic report")
+                                        appendLine("Runtime state: ${runtimeState.name}")
+                                        appendLine("Active machine: ${activeMachineId ?: "none"}")
+                                        appendLine()
+                                        appendLine("QEMU console:")
+                                        append(consoleText.ifBlank { "No console output recorded." })
+                                    }
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("QORVEX diagnostic report", report))
+                                    notice = "Console and runtime details copied to clipboard."
+                                }
+                            ) { Text("Copy console") }
+                        }
                     }
                 }
             }
