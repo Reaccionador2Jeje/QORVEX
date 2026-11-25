@@ -13,7 +13,8 @@ It lets you create VM profiles, prepare virtual disks, import installation media
 - Import ISO images into app-private storage and record SHA-256 metadata.
 - Launch QEMU ARM64 guests using the generic `virt` machine and UEFI firmware.
 - Attach a virtio virtual disk and optional read-only installation ISO.
-- Provide SLIRP user-mode networking.
+- Provide automatic SLIRP NAT networking without root or TAP: guest IPv4 subnet `10.0.2.0/24`, gateway `10.0.2.2`, DHCP leases starting at `10.0.2.15`, and the virtual DNS proxy at `10.0.2.3`.
+- Attach a virtio network adapter by default (`virtio-net-device` for ARM64 guests and `virtio-net-pci` for x86_64 guests).
 - Capture guest serial output in the in-app console.
 - Serve the guest framebuffer through QEMU VNC bound to `127.0.0.1` only.
 - Display the live framebuffer in the dashboard using a minimal RFB client (Raw 32-bit true-colour encoding).
