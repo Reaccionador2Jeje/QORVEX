@@ -13,8 +13,10 @@
 # Summary: ARM64 virtual machine manager for Android
 # Description: |-
 #   QORVEX manages ARM64 virtual machines on Android using QEMU.
-#   It currently provides a serial console and software emulation.
-#   Graphical display and touch input are not yet available.
+#   It provides VM profiles, virtual disks, ISO import, a serial console,
+#   a basic graphical framebuffer with touch/text input, and offline
+#   disk-only snapshots that require the VM to be stopped.
+#   Snapshots do not preserve RAM or live VM state.
 #   QORVEX does not bundle guest operating systems.
 # RepoType: git
 # Repo: https://github.com/Reaccionador2Jeje/QORVEX.git
