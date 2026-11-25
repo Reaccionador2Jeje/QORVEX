@@ -32,6 +32,8 @@ object QemuCommandBuilder {
             addAll(listOf("-accel", "tcg,thread=multi"))
             addAll(listOf("-smp", machine.cpuCores.toString()))
             addAll(listOf("-m", machine.memoryMiB.toString()))
+            // Define the backend before creating a NIC that references net0.
+            addAll(listOf("-netdev", USER_NETWORK))
 
             when (machine.architecture) {
                 GuestArchitecture.AARCH64 -> {
@@ -69,9 +71,7 @@ object QemuCommandBuilder {
                 }
             }
 
-            // Attach the same SLIRP NAT backend to the architecture-specific
-            // virtio NIC. QEMU supplies the guest DHCP lease and DNS proxy.
-            addAll(listOf("-netdev", USER_NETWORK))
+            // QEMU supplies the guest DHCP lease and DNS proxy through SLIRP.
             addAll(listOf("-display", "none"))
             addAll(listOf("-vnc", "127.0.0.1:0"))
             addAll(listOf("-serial", "stdio"))
