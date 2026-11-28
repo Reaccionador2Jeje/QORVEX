@@ -231,18 +231,21 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
         return withContext(Dispatchers.IO) {
             runCatching {
                 val qmpSocket = qmpSocketFor(machineId)
-                val gracefulShutdownSent = withContext(Dispatchers.IO) {
-                    QmpClient.requestQuit(qmpSocket)
+                val guestPowerdownRequested = withContext(Dispatchers.IO) {
+                    QmpClient.requestPowerdown(qmpSocket)
                 }
-                if (!gracefulShutdownSent) {
-                    appendConsoleLine("QMP graceful shutdown unavailable; using process termination.")
+                if (!guestPowerdownRequested) {
+                    appendConsoleLine("Could not request guest shutdown through QMP; waiting before terminating QEMU.")
                 }
-                if (!child.waitFor(STOP_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                if (!child.waitFor(GUEST_SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    appendConsoleLine("WARNING: guest did not shut down in time; terminating QEMU may risk guest data loss.")
                     child.destroy()
                 }
                 if (child.isAlive) {
-                    child.destroyForcibly()
-                    child.waitFor()
+                    if (!child.waitFor(PROCESS_TERMINATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                        child.destroyForcibly()
+                        child.waitFor()
+                    }
                 }
                 if (process === child) process = null
                 runCatching { sessionJournal.clear() }
@@ -309,8 +312,13 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
         return code to vars
     }
 
-    private fun qmpSocketFor(machineId: String): File =
-        File(File(appContext.filesDir, "qmp"), "${safeMachineKey(machineId)}.sock")
+    private fun qmpSocketFor(machineId: String): File {
+        // AF_UNIX paths are short on Android. A 16-hex-character digest keeps
+        // the socket well below the platform limit while retaining 64 bits of
+        // per-VM separation; only one QEMU process can run in this app.
+        val shortKey = safeMachineKey(machineId).take(16)
+        return File(File(appContext.filesDir, "qmp"), "$shortKey.sock")
+    }
 
     private fun safeMachineKey(id: String): String =
         MessageDigest.getInstance("SHA-256")
@@ -327,7 +335,8 @@ class QemuProcessRuntime(context: Context) : VirtualMachineRuntime {
         const val QEMU_LIBRARY = "libqemu-system-aarch64.so"
         const val FIRMWARE_CODE_ASSET = "firmware/AAVMF_CODE.fd"
         const val FIRMWARE_VARS_ASSET = "firmware/AAVMF_VARS.fd"
-        const val STOP_TIMEOUT_SECONDS = 5L
+        const val GUEST_SHUTDOWN_TIMEOUT_SECONDS = 30L
+        const val PROCESS_TERMINATION_TIMEOUT_SECONDS = 5L
         const val MAX_CONSOLE_CHARS = 48 * 1024
     }
 }

@@ -31,7 +31,7 @@ jobs:
             curl unzip ca-certificates git bzip2 ninja-build meson python3 python3-pip \
             pkg-config flex bison make cmake autoconf automake libtool \
             libglib2.0-dev libglib2.0-bin gettext libintl-perl \
-            binutils-aarch64-linux-gnu patchelf
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu patchelf
 
       - name: Build QEMU and source-build ARM64 UEFI firmware
         run: bash tools/build-qemu-android.sh

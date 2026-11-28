@@ -16,7 +16,7 @@ It lets you create VM profiles, prepare virtual disks, import installation media
 - Provide SLIRP user-mode networking.
 - Capture serial output in the in-app console.
 - Keep an active QEMU process supervised by an Android foreground service with a persistent notification and a Stop VM action.
-- Request graceful shutdown through QMP, with process termination as a fallback.
+- Request guest-initiated shutdown through QMP, with a timeout and process termination as a fallback.
 - Detect interrupted VM sessions and perform non-destructive virtual-disk container checks before a manual restart.
 
 ## Current limitations
@@ -35,7 +35,7 @@ The Android app uses Kotlin, Jetpack Compose, and Gradle.
 
 The QEMU runtime is built separately for Android/Bionic ARM64 by `tools/build-qemu-android.sh`. It pins the Podroid QEMU build recipe, builds QEMU 11.1.2 and SLIRP, and checks the resulting ELF architecture and 16 KiB page alignment. UEFI firmware is built separately from the pinned EDK II source revision by `tools/build-aavmf-from-source.sh`; no prebuilt Debian firmware package is copied into the APK.
 
-Requirements for the current build scripts: a Linux x86_64 host, Git, curl, Python 3 with `venv` and `pip`, GCC/G++, Make, Ninja, Meson, Autoconf/Automake/Libtool, NASM, ACPICA (`iasl`), UUID development headers, `patchelf`, and `readelf`. The QEMU runtime build no longer requires Docker.
+Requirements for the current build scripts: a Linux x86_64 host, Git, curl, Python 3 with `venv` and `pip`, GCC/G++, Make, Ninja, Meson, Autoconf/Automake/Libtool, NASM, ACPICA (`iasl`), UUID development headers, `gdbus-codegen`, `patchelf`, and `readelf`. The QEMU runtime build no longer requires Docker.
 
 ```bash
 bash tools/build-qemu-android.sh
@@ -49,7 +49,7 @@ A plain Gradle build without first producing and packaging the QEMU runtime does
 
 - Android application: Apache-2.0.
 - QEMU 11.1.2: GPL-2.0.
-- Firmware: EDK II/AAVMF, with the Debian package copyright notice.
+- Firmware: EDK II/AAVMF built from the pinned EDK II source revision recorded in `docs/THIRD-PARTY-LICENSES.md`.
 - Native build recipe: ExTV/Podroid at the pinned commit documented in `docs/THIRD-PARTY-LICENSES.md`.
 
 QORVEX does not claim ownership of QEMU, SLIRP, or EDK II. Corresponding source, build patches, and required notices must accompany redistribution of the relevant binaries. See [the third-party license record](docs/THIRD-PARTY-LICENSES.md).
