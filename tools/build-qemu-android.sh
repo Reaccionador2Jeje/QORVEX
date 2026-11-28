@@ -16,9 +16,22 @@ PREFIX="$WORK/deps"
 NDK_ROOT="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-$WORK/android-ndk-$NDK_VERSION}}"
 JOBS="${QORVEX_BUILD_JOBS:-$(getconf _NPROCESSORS_ONLN)}"
 
-for tool in git curl unzip sha1sum make ninja meson pkg-config flex bison autoconf automake libtoolize gcc g++ patchelf readelf python3; do
+for tool in git curl unzip sha1sum make ninja meson pkg-config flex bison autoconf automake libtoolize gcc g++ patchelf readelf python3 gdbus-codegen; do
  command -v "$tool" >/dev/null || { echo "Missing build prerequisite: $tool" >&2; exit 1; }
 done
+
+# The host may ship newer gdbus-codegen than the GLib 2.82.5 target library.
+# Cap generated API usage to avoid references to symbols absent from the target.
+HOST_GDBUS_CODEGEN="$(command -v gdbus-codegen)"
+export HOST_GDBUS_CODEGEN
+mkdir -p "$WORK/bin"
+cat > "$WORK/bin/gdbus-codegen" <<'GDBUSCODEGEN'
+#!/bin/sh
+exec "$HOST_GDBUS_CODEGEN" --glib-max-allowed=2.82 "$@"
+GDBUSCODEGEN
+chmod +x "$WORK/bin/gdbus-codegen"
+export PATH="$WORK/bin:$PATH"
+
 mkdir -p "$WORK" "$SRC" "$PREFIX"/{lib,include,lib/pkgconfig} "$OUT/jniLibs/arm64-v8a" "$OUT/assets/firmware"
 if [ ! -d "$PODROID_DIR/.git" ]; then git clone "$PODROID_REPO" "$PODROID_DIR"; fi
 git -C "$PODROID_DIR" fetch --depth 1 origin "$PODROID_COMMIT"
