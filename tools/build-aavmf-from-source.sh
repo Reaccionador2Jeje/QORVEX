@@ -33,7 +33,18 @@ python3 -m venv "$WORK/venv"
 export PATH="$WORK/venv/bin:$PATH"
 
 echo "Building AAVMF from EDK II commit $EDK2_COMMIT..."
-make -C "$EDK2_DIR/BaseTools" CFLAGS="-std=gnu17" -j"$(getconf _NPROCESSORS_ONLN)"
+# The bundled legacy Pccts makefiles hard-code COPT=-O and ignore CFLAGS.
+# Their old unspecified-argument callbacks require GNU17 with modern GCC.
+PCCTS_MAKEFILES=(
+    "$EDK2_DIR/BaseTools/Source/C/VfrCompile/Pccts/antlr/makefile"
+    "$EDK2_DIR/BaseTools/Source/C/VfrCompile/Pccts/dlg/makefile"
+)
+for makefile in "${PCCTS_MAKEFILES[@]}"; do
+    test -f "$makefile"
+    sed -i 's/^COPT=-O$/COPT=-O -std=gnu17/' "$makefile"
+    grep -q '^COPT=-O -std=gnu17$' "$makefile"
+done
+make -C "$EDK2_DIR/BaseTools" -j"$(getconf _NPROCESSORS_ONLN)"
 (
     cd "$EDK2_DIR"
     set +u
