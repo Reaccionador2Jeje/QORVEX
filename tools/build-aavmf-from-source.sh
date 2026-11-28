@@ -41,8 +41,10 @@ PCCTS_MAKEFILES=(
 )
 for makefile in "${PCCTS_MAKEFILES[@]}"; do
     test -f "$makefile"
-    sed -i 's/^COPT=-O$/COPT=-O -std=gnu17/' "$makefile"
-    grep -q '^COPT=-O -std=gnu17$' "$makefile"
+    # These pinned legacy makefiles use CRLF; preserve it while matching either
+    # CRLF or LF so the patch remains effective on Linux checkouts.
+    sed -i 's/^COPT=-O\(\r\?\)$/COPT=-O -std=gnu17\1/' "$makefile"
+    grep -q '^COPT=-O -std=gnu17' "$makefile"
 done
 make -C "$EDK2_DIR/BaseTools" -j"$(getconf _NPROCESSORS_ONLN)"
 (
