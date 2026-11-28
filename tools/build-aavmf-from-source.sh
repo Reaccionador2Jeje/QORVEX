@@ -9,8 +9,9 @@ EDK2_REPO="https://github.com/tianocore/edk2.git"
 EDK2_COMMIT="fff6d81270b57ee786ea18ad74f43149b9f03494"
 EDK2_DIR="$WORK/edk2"
 OUT="$ROOT/out/qemu-runtime/assets/firmware"
+AARCH64_CROSS_PREFIX="${GCC5_AARCH64_PREFIX:-aarch64-linux-gnu-}"
 
-for tool in git make gcc python3 iasl nasm; do
+for tool in git make gcc python3 iasl nasm "${AARCH64_CROSS_PREFIX}gcc"; do
     command -v "$tool" >/dev/null || {
         echo "Missing required EDK II build tool: $tool" >&2
         exit 1
@@ -59,6 +60,8 @@ make -C "$EDK2_DIR/BaseTools" -j"$(getconf _NPROCESSORS_ONLN)"
     cd "$EDK2_DIR"
     set +u
     source edksetup.sh
+    # EDK II otherwise falls back to host gcc, which cannot emit AArch64 code.
+    export GCC5_AARCH64_PREFIX="$AARCH64_CROSS_PREFIX"
     build -a AARCH64 -t GCC5 -p ArmVirtPkg/ArmVirtQemu.dsc -b RELEASE
 )
 
@@ -79,6 +82,7 @@ Commit: $EDK2_COMMIT
 Platform: ArmVirtPkg/ArmVirtQemu.dsc
 Architecture: AARCH64
 Build: RELEASE_GCC5
+AARCH64 cross compiler prefix: $AARCH64_CROSS_PREFIX
 Outputs: QEMU_EFI.fd -> AAVMF_CODE.fd; QEMU_VARS.fd -> AAVMF_VARS.fd
 EOF
 
