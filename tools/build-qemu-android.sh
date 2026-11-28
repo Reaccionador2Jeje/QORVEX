@@ -244,7 +244,7 @@ grep -q 'LIBUSB_SPEED_UNKNOWN' "$QEMU_DIR/hw/usb/host-libusb.c"
 (
  cd "$QEMU_DIR"
  ./configure --cc="$CC" --cross-prefix="$LLVM/bin/llvm-" \
-  --extra-cflags="-fPIC -DANDROID -include $WORK/shm.h -I$PREFIX/include -I$PREFIX/include/glib-2.0 -I$PREFIX/lib/glib-2.0/include" \
+  --extra-cflags="-fPIC -DANDROID -DGLIB_VERSION_2_84=152576 -include $WORK/shm.h -I$PREFIX/include -I$PREFIX/include/glib-2.0 -I$PREFIX/lib/glib-2.0/include" \
   --extra-ldflags="-L$PREFIX/lib -Wl,-z,max-page-size=16384 $PREFIX/lib/libucontext.a $PREFIX/lib/libshm.a $PREFIX/lib/libqemujmp.a" \
   --prefix="$WORK/qemu-out" --target-list=aarch64-softmmu --enable-tcg --enable-slirp --enable-virtfs --enable-libusb --enable-pie \
   --disable-docs --disable-gtk --disable-sdl --disable-vnc --disable-vhost-user --disable-plugins --with-coroutine=ucontext
