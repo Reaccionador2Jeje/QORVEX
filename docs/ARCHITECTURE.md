@@ -22,7 +22,7 @@
              +---- app-private RAW disk
              +---- imported installation ISO
              +---- serial stdio -> Compose console
-             +---- QMP Unix socket -> graceful shutdown
+             +---- QMP Unix socket -> guest powerdown request
 
 The file named `libqemu-system-aarch64.so` is a native executable packaged in `jniLibs/arm64-v8a` so Android extracts it into `nativeLibraryDir`. It is executed as a child process; it is not passed to `System.loadLibrary()`.
 
@@ -32,11 +32,11 @@ The file named `libqemu-system-aarch64.so` is a native executable packaged in `j
 - Android host ABI: **arm64-v8a**, Android API 26 minimum.
 - QEMU target: **aarch64-softmmu**.
 - Accelerator: **TCG**, with multithreaded translation enabled.
-- Build recipe: Podroid's Android ARM64 QEMU Docker build pinned to commit `e3fc1befa3c135d28bf8d40e3c2264d93fea87ef`. The exact upstream build recipe and Android compatibility patches are fetched at that immutable commit by `tools/build-qemu-android.sh`.
+- Build recipe: Podroid's Android ARM64 QEMU build recipe pinned to commit `e3fc1befa3c135d28bf8d40e3c2264d93fea87ef`. The exact upstream build recipe and Android compatibility patches are fetched at that immutable commit by `tools/build-qemu-android.sh`.
 - Native dependency: QEMU SLIRP library `libslirp.so`.
-- Firmware: Debian Bookworm `qemu-efi-aarch64` package, AAVMF_CODE and AAVMF_VARS.
+- Firmware: AAVMF built from the pinned EDK II source revision recorded in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md); it is not copied from a Debian firmware package.
 
-The CI workflow builds the native artifacts first, validates the QEMU ELF architecture and 16 KiB LOAD-segment alignment, then packages them into the APK.
+The CI workflow builds the native artifacts first, validates the QEMU ELF architecture and 16 KiB LOAD-segment alignment, then packages them into the APK. A successful workflow run and a boot on a physical Android device are required before claiming a verified release.
 
 ## 3. VM launch configuration
 
@@ -51,7 +51,7 @@ The first runtime launches only ARM64 guests using QEMU's generic `virt` machine
 - optional ISO attached as a read-only virtio CD-ROM with CD-ROM boot priority
 - SLIRP user networking through virtio-net
 - serial console on stdio; graphical display disabled in this first backend
-- optional QMP Unix-domain socket for monitor commands and graceful shutdown
+- optional QMP Unix-domain socket for requesting guest ACPI powerdown; if the guest does not exit within the timeout, QEMU is terminated with a data-loss warning
 
 All command arguments are passed as an argument vector to ProcessBuilder. No shell command string is assembled from profile data.
 
@@ -64,7 +64,7 @@ All command arguments are passed as an argument vector to ProcessBuilder. No she
 
 ## 5. Runtime limits
 
-The foreground service owns the runtime lifetime while a guest is active, so moving the dashboard to the background or recreating the Activity does not discard the QEMU process or its observable runtime state. The service uses an ongoing notification with a Stop VM action. This does not promise recovery after Android kills the entire app process, a force-stop, or a device reboot. It exposes serial output only; there is no framebuffer surface, touch input, audio, pause/resume, or interactive QMP management UI yet. The stop action attempts a QMP `quit` request and falls back to process termination if the monitor is unavailable.
+The foreground service owns the runtime lifetime while a guest is active, so moving the dashboard to the background or recreating the Activity does not discard the QEMU process or its observable runtime state. The service uses an ongoing notification with a Stop VM action. This does not promise recovery after Android kills the entire app process, a force-stop, or a device reboot. It exposes serial output only; there is no framebuffer surface, touch input, audio, pause/resume, or interactive QMP management UI yet. The stop action requests guest shutdown with QMP `system_powerdown`, waits up to 30 seconds, then terminates QEMU if the guest has not exited. Forced termination may risk guest data loss and is reported in the serial console.
 
 Only ARM64 guests are supported. x86_64 profiles are rejected at runtime until an x86_64-softmmu build is included.
 
@@ -79,7 +79,7 @@ Only ARM64 guests are supported. x86_64 profiles are rejected at runtime until a
 - QEMU runs under an Android foreground service with a persistent notification and user-accessible stop action. The service removes its notification after the guest process exits.
 - A durable session journal detects a previous unclean app-process exit. QORVEX does not automatically restart the guest; it validates the disk container structure and reports the result before the user decides what to do.
 - Disk validation checks regular-file status, private-directory containment, expected logical capacity, and read/write access. It does not inspect or repair the guest filesystem and does not prove guest data consistency.
-- QMP graceful shutdown is available, with forced process termination retained as a fallback.
+- QMP requests guest-initiated ACPI powerdown. If the guest does not exit within 30 seconds, the runtime warns that terminating QEMU may risk data loss before falling back to process termination.
 
 ## 7. Licensing
 
