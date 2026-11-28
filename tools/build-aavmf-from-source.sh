@@ -46,6 +46,14 @@ for makefile in "${PCCTS_MAKEFILES[@]}"; do
     sed -i 's/^COPT=-O\(\r\?\)$/COPT=-O -std=gnu17\1/' "$makefile"
     grep -q '^COPT=-O -std=gnu17' "$makefile"
 done
+
+# EfiRom stores the result of strstr in a pointer to mutable CHAR8, which
+# triggers GCC's -Werror=discarded-qualifiers. The pointer is only read.
+EFIROM_SOURCE="$EDK2_DIR/BaseTools/Source/C/EfiRom/EfiRom.c"
+test -f "$EFIROM_SOURCE"
+sed -i 's/^[[:space:]]*CHAR8[[:space:]]*\*Ptr0;[[:space:]]*$/  CONST CHAR8 *Ptr0;/' "$EFIROM_SOURCE"
+grep -q 'CONST CHAR8 \*Ptr0;' "$EFIROM_SOURCE"
+
 make -C "$EDK2_DIR/BaseTools" -j"$(getconf _NPROCESSORS_ONLN)"
 (
     cd "$EDK2_DIR"
