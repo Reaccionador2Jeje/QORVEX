@@ -33,7 +33,7 @@ python3 -m venv "$WORK/venv"
 export PATH="$WORK/venv/bin:$PATH"
 
 echo "Building AAVMF from EDK II commit $EDK2_COMMIT..."
-make -C "$EDK2_DIR/BaseTools" -j"$(getconf _NPROCESSORS_ONLN)"
+make -C "$EDK2_DIR/BaseTools" CFLAGS="-std=gnu17" -j"$(getconf _NPROCESSORS_ONLN)"
 (
     cd "$EDK2_DIR"
     set +u
